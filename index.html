@@ -953,6 +953,13 @@ details[open]>summary .me-chev{transform:rotate(90deg)}
 .pm-n{position:absolute;right:-9px;top:-7px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--ink);color:var(--bg);font:700 10.5px/18px var(--f-body);text-align:center;font-variant-numeric:tabular-nums}
 .pm-n:empty{display:none}
 .pm-chip:not(.pm-cnt) .pm-n{display:none}
+/* ordinateur et tablette : le nombre de points en petite pastille à droite du nom, plus par-dessus le pictogramme (19/11/2026) */
+@media (min-width:701px){
+  .pm-ring{display:contents}
+  .pm-chip svg{order:0}.pm-l{order:1}
+  .pm-n{position:static;order:2;min-width:0;height:20px;padding:0 7px;margin-left:2px;font:700 11.5px/20px var(--f-mono);background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c)}
+  .pm-chip[aria-pressed="true"] .pm-n{background:rgba(255,255,255,.24);color:#fff}
+}
 .pm-hbtn{display:flex;align-items:center;gap:6px}
 .pm-all{color:var(--accent)}
 @media (max-width:700px){
