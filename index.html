@@ -439,7 +439,7 @@ html[data-motion="reduce"] dialog.kind-dlg{animation:none}
 .tt-map,.tt-lmap{width:100%;height:240px;border-radius:12px;background:var(--bg);display:block}
 @media (max-width:700px){.tt-map,.tt-lmap{height:190px}}
 .tt-lmap{overflow:hidden;cursor:default}
-.tt-lmap .leaflet-tile-pane{filter:grayscale(.55) opacity(.8)}
+.tt-lmap .leaflet-tile-pane,.tt-lmap .sgl{filter:grayscale(.55) opacity(.8)}
 .tt-lmap .leaflet-control-attribution{font-size:9px;padding:0 4px}
 .tt-tip{background:var(--panel);color:var(--ink);border:0;border-radius:999px;padding:2px 8px;font:700 12px var(--f-body);box-shadow:0 1px 2px rgba(20,32,27,.12),0 4px 12px rgba(20,32,27,.08)}
 .tt-tip::before{display:none}
@@ -1683,6 +1683,7 @@ body.lim #outPage .out-pick,body.lim #outPage .out-top,body.lim #outPage .out-su
 .hp .hp-mail{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:999px;font-size:15px;font-weight:700;background:var(--brand);color:var(--brand-ink);text-decoration:none;margin-top:4px}
 .hp .hp-foot{text-align:center;font-size:12.5px;color:var(--muted)}
 .hp :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sgl{position:absolute!important;inset:0;z-index:0;pointer-events:none;overflow:hidden}.sgl .maplibregl-canvas{outline:none}
 </style>
 </head>
 <body>
@@ -3723,13 +3724,153 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#mapCar
 function makeBases() {
   const osmAttr = T('© contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>');
   const esriAttr = T('Tuiles © <a href="https://www.esri.com">Esri</a>');
-  return {
+  const out = {};
+  if (sglOk()) out[SGL_NAME] = new SillageGL(); // fond Sillage en tête, choisi par défaut sur toutes les cartes (baseDef)
+  return Object.assign(out, {
     [T('Plan (OSM)')]: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: osmAttr }),
     [T('Vélo (CyclOSM)')]: L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { maxZoom: 20, subdomains: 'abc', attribution: osmAttr + ' · <a href="https://www.cyclosm.org">CyclOSM</a>' }),
-    [T('Relief (OpenTopoMap)')]: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, subdomains: 'abc', attribution: osmAttr + ', SRTM · © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)' }),
-    'Topo (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: esriAttr }),
     'Satellite (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: esriAttr + ', Maxar, Earthstar Geographics' })
+  });
+}
+const SGL_NAME = 'Sillage';
+function sglOk() { return typeof SillageGL === 'function' && !!window.WebGLRenderingContext; }
+// fond par défaut de toutes les cartes : Sillage (sinon l'ancien défaut)
+function baseDef() { return sglOk() ? SGL_NAME : location.protocol === 'file:' ? T('Vélo (CyclOSM)') : T('Plan (OSM)'); }
+// fond enregistré (pmr-base2) s'il existe dans la liste, sinon le défaut
+function baseName(bases) { let n = baseDef(); try { const b = localStorage.getItem('pmr-base2'); if (b && bases[b] && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) n = b; } catch (e) {} return n; }
+// 19/11/2026 : Sillage devient le fond de toutes les cartes, une fois par appareil l'ancien choix est oublié
+try { if (!localStorage.getItem('pmr-sgl-def')) { localStorage.setItem('pmr-sgl-def', '1'); localStorage.removeItem('pmr-base2'); localStorage.removeItem('pmr-pm-base2'); } } catch (e) {}
+/* Fond de carte « Sillage » (19/11/2026, page Carte, test.html) : carte vectorielle OpenFreeMap (données OpenStreetMap,
+   gratuit, sans clé) + relief AWS Terrain Tiles, dessinée par MapLibre GL aux couleurs Sillage (thème clair / sombre).
+   MapLibre (jsDelivr) n'est chargé que quand ce fond est choisi. La carte MapLibre est un calque sous les volets Leaflet,
+   hors du volet tourné par leaflet-rotate : elle suit la vue Leaflet (centre, zoom − 1, cap) à chaque mouvement. */
+const SGL_JS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+const SGL_CSS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css';
+let sglP = null;
+function sglLoad() {
+  if (sglP) return sglP;
+  if (!document.querySelector('link[data-sgl]')) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = SGL_CSS; l.dataset.sgl = '1'; document.head.appendChild(l); }
+  return (sglP = loadScript(SGL_JS).then(() => !!window.maplibregl).catch(() => { sglP = null; return false; }));
+}
+const SGL_PAL = {
+  light: { bg: '#EEF0EA', forest: '#D3E1CC', grass: '#E2EADB', farm: '#ECEEE4', urban: '#E6E3DD', rock: '#E4E2DC', water: '#B9D3E6', waterLine: '#8FB6D4', waterLabel: '#3E6E94', build: '#DCD8D1', minor: '#FFFFFF', minorCase: '#D3D6CF', major: '#FFF3D6', majorCase: '#E0C88E', hwy: '#F6D58A', hwyCase: '#C9A24A', path: '#2E7D4F', cyc: '#178A4E', cycCase: '#FFFFFF', dirt: '#A47A45', ink: '#14201B', ink2: '#4C5852', halo: '#F6F7F3', border: '#9A7FB0', shade: '#14201B', hl: '#FFFFFF', ex: 0.3 },
+  dark: { bg: '#18221D', forest: '#1F3127', grass: '#1D2A23', farm: '#1B2620', urban: '#232A26', rock: '#252B27', water: '#14324A', waterLine: '#235A80', waterLabel: '#8CC3EC', build: '#2A332E', minor: '#3A463F', minorCase: '#1B2621', major: '#5A4F33', majorCase: '#2A2418', hwy: '#8A6A22', hwyCase: '#3C2E10', path: '#6FCF97', cyc: '#6FCF97', cycCase: '#14201B', dirt: '#C9A26E', ink: '#EEF1EC', ink2: '#A8B3AC', halo: '#121B17', border: '#7E6A96', shade: '#000000', hl: '#6F8A7C', ex: 0.35 }
+};
+const sglDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+function sglStyle(p) {
+  const f = ['Noto Sans Regular'], fb = ['Noto Sans Bold'], fi = ['Noto Sans Italic'];
+  const cls = a => ['in', ['get', 'class'], ['literal', a]];
+  // piste cyclable : highway=cycleway, ou chemin réservé / conseillé aux vélos (bicycle=designated)
+  const CYC = ['all', cls(['path', 'track']), ['any', ['==', ['get', 'subclass'], 'cycleway'], ['==', ['get', 'bicycle'], 'designated']]];
+  const road = (id, c, w, filt, mz) => Object.assign({ id, type: 'line', source: 'om', 'source-layer': 'transportation', filter: filt, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': c, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom']].concat(w) } }, mz ? { minzoom: mz } : {});
+  return {
+    version: 8, glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sources: {
+      om: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
+      dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 13 }
+    },
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': p.bg } },
+      { id: 'lc', type: 'fill', source: 'om', 'source-layer': 'landcover', paint: { 'fill-color': ['match', ['get', 'class'], 'wood', p.forest, 'grass', p.grass, 'farmland', p.farm, 'rock', p.rock, 'ice', '#F4F7F8', p.bg], 'fill-opacity': 0.9 } },
+      { id: 'park', type: 'fill', source: 'om', 'source-layer': 'park', paint: { 'fill-color': p.grass, 'fill-opacity': 0.5 } },
+      { id: 'lu', type: 'fill', source: 'om', 'source-layer': 'landuse', filter: cls(['residential', 'commercial', 'industrial', 'retail', 'suburb', 'neighbourhood']), paint: { 'fill-color': p.urban, 'fill-opacity': 0.75 } },
+      { id: 'shade', type: 'hillshade', source: 'dem', paint: { 'hillshade-shadow-color': p.shade, 'hillshade-highlight-color': p.hl, 'hillshade-accent-color': p.shade, 'hillshade-exaggeration': p.ex, 'hillshade-illumination-direction': 315 } },
+      { id: 'water', type: 'fill', source: 'om', 'source-layer': 'water', paint: { 'fill-color': p.water } },
+      { id: 'waterline', type: 'line', source: 'om', 'source-layer': 'water', paint: { 'line-color': p.waterLine, 'line-width': 0.6 } },
+      { id: 'river', type: 'line', source: 'om', 'source-layer': 'waterway', paint: { 'line-color': p.water, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 2.5] } },
+      { id: 'build', type: 'fill', source: 'om', 'source-layer': 'building', minzoom: 13, paint: { 'fill-color': p.build, 'fill-opacity': 0.85 } },
+      { id: 'bound', type: 'line', source: 'om', 'source-layer': 'boundary', filter: ['<=', ['get', 'admin_level'], 4], paint: { 'line-color': p.border, 'line-width': 1.2, 'line-dasharray': [3, 2], 'line-opacity': 0.7 } },
+      road('minor-c', p.minorCase, [12, 1.4, 16, 9], cls(['minor', 'service', 'tertiary']), 12),
+      road('major-c', p.majorCase, [8, 0.8, 12, 3, 16, 13], cls(['primary', 'secondary', 'trunk'])),
+      road('hwy-c', p.hwyCase, [6, 1, 12, 4.5, 16, 16], cls(['motorway'])),
+      // sentiers (pas les pistes cyclables) : pointillés verts
+      { id: 'path', type: 'line', source: 'om', 'source-layer': 'transportation', minzoom: 12, filter: ['all', cls(['path']), ['!', CYC]], paint: { 'line-color': p.path, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 2], 'line-dasharray': [2, 1.5], 'line-opacity': 0.7 } },
+      // chemins (track) : pointillés couleur terre, plus marqués quand le revêtement est non goudronné
+      { id: 'track', type: 'line', source: 'om', 'source-layer': 'transportation', minzoom: 12, filter: ['all', cls(['track']), ['!', CYC]], paint: { 'line-color': p.dirt, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.9, 16, 2.6], 'line-dasharray': [3, 1.6], 'line-opacity': 0.85 } },
+      road('minor', p.minor, [10, 0.4, 12, 1, 16, 7], ['all', cls(['minor', 'service', 'tertiary']), ['!=', ['get', 'surface'], 'unpaved']], 10),
+      // petites routes non goudronnées : même largeur, tirets couleur terre sur le liseré
+      Object.assign(road('minor-dirt', p.dirt, [10, 0.4, 12, 1, 16, 5], ['all', cls(['minor', 'service', 'tertiary']), ['==', ['get', 'surface'], 'unpaved']], 10), { layout: { 'line-join': 'round' }, paint: { 'line-color': p.dirt, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 10, 0.4, 12, 1, 16, 5], 'line-dasharray': [2.2, 1.2] } }),
+      // pistes cyclables et voies vertes : trait vert plein avec liseré
+      { id: 'cyc-c', type: 'line', source: 'om', 'source-layer': 'transportation', minzoom: 10, filter: CYC, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': p.cycCase, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.2, 13, 4, 16, 8], 'line-opacity': 0.9 } },
+      { id: 'cyc', type: 'line', source: 'om', 'source-layer': 'transportation', minzoom: 10, filter: CYC, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': p.cyc, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.4, 13, 2.6, 16, 5] } },
+      road('major', p.major, [8, 0.5, 12, 2, 16, 11], cls(['primary', 'secondary', 'trunk'])),
+      road('hwy', p.hwy, [6, 0.6, 12, 3, 16, 13], cls(['motorway'])),
+      { id: 'water-lbl', type: 'symbol', source: 'om', 'source-layer': 'water_name', layout: { 'text-field': ['get', 'name'], 'text-font': fi, 'text-size': 13, 'text-letter-spacing': 0.06 }, paint: { 'text-color': p.waterLabel, 'text-halo-color': p.water, 'text-halo-width': 1 } },
+      { id: 'peak-dot', type: 'circle', source: 'om', 'source-layer': 'mountain_peak', minzoom: 11, filter: ['has', 'name'], paint: { 'circle-radius': 2.6, 'circle-color': p.ink2 } },
+      { id: 'peak', type: 'symbol', source: 'om', 'source-layer': 'mountain_peak', minzoom: 11, filter: ['has', 'name'], layout: { 'text-field': ['concat', ['get', 'name'], '\n', ['to-string', ['get', 'ele']], ' m'], 'text-font': f, 'text-size': 10.5, 'text-offset': [0, 0.8], 'text-anchor': 'top', 'text-optional': true }, paint: { 'text-color': p.ink2, 'text-halo-color': p.halo, 'text-halo-width': 1.4 } },
+      { id: 'place', type: 'symbol', source: 'om', 'source-layer': 'place', filter: cls(['city', 'town', 'village', 'hamlet']), layout: { 'text-field': ['get', 'name'], 'text-font': ['match', ['get', 'class'], ['city', 'town'], ['literal', fb], ['literal', f]], 'text-size': ['match', ['get', 'class'], 'city', 17, 'town', 14, 'village', 12, 11], 'symbol-sort-key': ['match', ['get', 'class'], 'city', 0, 'town', 1, 'village', 2, 3], 'text-padding': 4 }, paint: { 'text-color': p.ink, 'text-halo-color': p.halo, 'text-halo-width': 1.8 } }
+    ]
   };
+}
+// Calque Leaflet « fond Sillage » : une carte MapLibre non interactive, recalée sur la vue Leaflet.
+const SillageGL = (typeof L !== 'undefined') && L.Layer.extend({
+  options: { minZoom: 2, maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · <a href="https://openfreemap.org">OpenFreeMap</a> · relief AWS Terrain Tiles' },
+  onAdd(map) {
+    this._map = map;
+    if (!this._el) { this._el = document.createElement('div'); this._el.className = 'sgl'; }
+    map.getContainer().insertBefore(this._el, map.getContainer().firstChild);
+    this._el.style.display = '';
+    this._sync = () => this._view();
+    this._anim = e => this._zoomAnim(e);
+    map.on('move zoom rotate viewreset resize zoomend', this._sync); map.on('zoomanim', this._anim);
+    sglLoad().then(ok => {
+      if (!ok || !this._map) { this._el.innerHTML = `<p class="hint" style="padding:16px">${escH(T("La carte n'a pas pu se charger (connexion requise)."))}</p>`; return; }
+      if (!this._gl) {
+        this._dark = sglDark();
+        this._gl = new maplibregl.Map({ container: this._el, style: sglStyle(SGL_PAL[this._dark ? 'dark' : 'light']), interactive: false, attributionControl: false, fadeDuration: 0, center: [0, 0], zoom: 1 });
+        SGL.layers.add(this);
+      }
+      this._gl.resize(); this._view();
+    });
+  },
+  onRemove(map) { this._unanim(); map.off('move zoom rotate viewreset resize zoomend', this._sync); map.off('zoomanim', this._anim); if (this._el) { this._el.style.display = 'none'; this._el.remove(); } this._map = null; },
+  /* Zoom animé de Leaflet (molette, + / −, double-clic, fin de pincement) : pendant ~250 ms les volets Leaflet sont
+     agrandis par une transition CSS, puis la vue change d'un coup. Avant, MapLibre sautait tout de suite au zoom final
+     et la trace ne collait plus au fond (bug du 19/11/2026). Désormais le canvas MapLibre reçoit la même transformation
+     (agrandissement + décalage à l'écran, même courbe que Leaflet), puis la vraie vue est redessinée à la fin. */
+  _zoomAnim(e) {
+    const m = this._map, g = this._gl; if (!m || !g) return;
+    const s = m.getZoomScale(e.zoom, m.getZoom()), p = m.latLngToContainerPoint(e.center), o = m.getSize().divideBy(2);
+    const tx = (1 - s) * o.x + s * (o.x - p.x), ty = (1 - s) * o.y + s * (o.y - p.y), cv = g.getCanvasContainer();
+    cv.style.transformOrigin = '0 0'; cv.style.transition = 'none'; cv.style.transform = '';
+    void cv.offsetWidth; // repart de l'état actuel
+    cv.style.transition = 'transform .25s cubic-bezier(0,0,0.25,1)';
+    cv.style.transform = `translate(${tx}px,${ty}px) scale(${s})`;
+    this._animOn = true;
+  },
+  _unanim() { if (!this._animOn || !this._gl) return; const cv = this._gl.getCanvasContainer(); cv.style.transition = 'none'; cv.style.transform = ''; this._animOn = false; },
+  _view() {
+    const m = this._map, g = this._gl; if (!m || !g) return;
+    if (m._animatingZoom) return; // transition en cours : le canvas suit par la transformation CSS
+    const c = m.getCenter(), z = m.getZoom();
+    if (g.getCanvas().width !== Math.round(this._el.clientWidth * devicePixelRatio)) g.resize();
+    g.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(0, z - 1), bearing: m.getBearing ? -m.getBearing() : 0 });
+    if (this._animOn) { try { g.redraw(); } catch (er) {} this._unanim(); } // nouvelle vue dessinée avant de retirer l'agrandissement
+  },
+  retheme() { const d = sglDark(); if (this._gl && d !== this._dark) { this._dark = d; this._gl.setStyle(sglStyle(SGL_PAL[d ? 'dark' : 'light'])); } }
+});
+const SGL = { layers: new Set(), retheme() { SGL.layers.forEach(l => l.retheme()); } };
+function sglOn(m) { let f = false; if (m && typeof SillageGL === 'function') m.eachLayer(l => { if (l instanceof SillageGL) f = true; }); return f; }
+/* Image du fond Sillage (vignettes de Mes parcours, export image) : une carte MapLibre hors écran, toujours en thème clair,
+   réutilisée et appelée une demande à la fois ; null si les tuiles ne sont pas venues en 20 s. */
+let SGL_SHOT = null, SGL_Q = Promise.resolve();
+function sglShot(o) { // { lon, lat, zoom (MapLibre), w, h, pr }
+  const job = SGL_Q.then(async () => {
+    if (!(await sglLoad())) return null;
+    if (!SGL_SHOT) {
+      const el = document.createElement('div'); el.style.cssText = 'position:fixed;left:-30000px;top:0;width:64px;height:64px;pointer-events:none'; document.body.appendChild(el);
+      SGL_SHOT = new maplibregl.Map({ container: el, style: sglStyle(SGL_PAL.light), interactive: false, attributionControl: false, fadeDuration: 0, preserveDrawingBuffer: true, center: [0, 0], zoom: 1 });
+    }
+    const g = SGL_SHOT, el = g.getContainer();
+    el.style.width = Math.round(o.w) + 'px'; el.style.height = Math.round(o.h) + 'px';
+    try { g.setPixelRatio(o.pr || 1); } catch (e) {}
+    g.resize(); g.jumpTo({ center: [o.lon, o.lat], zoom: Math.max(0, o.zoom), bearing: 0 });
+    await new Promise(r => { const t = setTimeout(r, 20000); g.once('idle', () => { clearTimeout(t); r(); }); g.triggerRepaint(); });
+    if (!g.loaded() || !g.areTilesLoaded()) return null;
+    const src = g.getCanvas(), cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
+    cv.getContext('2d').drawImage(src, 0, 0); return cv;
+  }).catch(() => null);
+  SGL_Q = job; return job;
 }
 // écran tactile : pointeur « coarse », ou l'app iPhone / Android (le simulateur d'iPhone se déclare parfois en pointeur fin)
 const MAP_TOUCH = matchMedia('(pointer: coarse)').matches || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -3742,10 +3883,7 @@ function initMap() {
   const osmAttr = T('© contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>');
   const esriAttr = T('Tuiles © <a href="https://www.esri.com">Esri</a>');
   const bases = makeBases();
-  const isLocal = location.protocol === 'file:';
-  let baseName = isLocal ? 'Topo (Esri)' : T('Plan (OSM)');
-  try { const saved = localStorage.getItem('pmr-base2'); if (saved && bases[saved] && !(isLocal && saved === T('Plan (OSM)'))) baseName = saved; } catch (e) {}
-  bases[baseName].addTo(map);
+  bases[baseName(bases)].addTo(map);
   L.control.layers(bases, null, { position: 'topright' }).addTo(map);
   map.createPane('poiPane').style.zIndex = 620; // lieux du mode ultra au-dessus des flèches de vent
   map.on('moveend', () => renderWindArrows());
@@ -4041,7 +4179,10 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
   // fond de carte
   let tl = null; m.eachLayer(l => { if (l instanceof L.TileLayer) tl = l; });
   let missing = 0;
-  if (tl) {
+  if (o.sgl || sglOn(m)) { // fond Sillage : rendu MapLibre hors écran au cadrage de la carte
+    const cc = m.getCenter(), im = await sglShot({ lon: cc.lng, lat: cc.lat, zoom: Math.max(0, m.getZoom() - 1), w: W, h: H, pr: 2 });
+    if (im) c.drawImage(im, x0, y0, W, H); else missing++;
+  } else if (tl) {
     // zoom fractionnaire possible (carte de l'export) : tuiles du zoom entier le plus proche, mises à l'échelle
     const zf = m.getZoom(), z = Math.round(zf), sc = 2 ** (zf - z), ts = tl.getTileSize().x, n = 2 ** z, jobs = [];
     const org = m.containerPointToLayerPoint([0, 0]).add(m.getPixelOrigin()).divideBy(sc), tw = ts * sc;
@@ -4267,7 +4408,7 @@ async function expMapShot(o) { // o : { m (carte d'origine, pour le fond), rg, w
     const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2;
     const c = cv.getContext('2d'); c.scale(2, 2);
     const { w: _w, h: _h, ...rest } = o;
-    cv.missing = await drawMapTo(c, 0, 0, w, h, { ...rest, m: tmp, bare: true });
+    cv.missing = await drawMapTo(c, 0, 0, w, h, { ...rest, m: tmp, bare: true, sgl: sglOn(src) });
     return cv;
   } finally { if (tmp) tmp.remove(); div.remove(); }
 }
@@ -6015,8 +6156,7 @@ function planLeaflet(slot, d) {
     PLAN.el = document.createElement('div'); PLAN.el.className = 'pd-lmap'; PLAN.el.setAttribute('role', 'img');
     PLAN.m = L.map(PLAN.el, { zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, tap: false, zoomSnap: 0.25 });
     PLAN.m.attributionControl.setPrefix(false);
-    const bases = makeBases(); let name = location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)');
-    try { const b = localStorage.getItem('pmr-base2'); if (b && bases[b] && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) name = b; } catch (e) {}
+    const bases = makeBases(), name = baseName(bases);
     bases[name].addTo(PLAN.m);
     PLAN.lay = L.layerGroup().addTo(PLAN.m);
   }
@@ -6288,8 +6428,7 @@ function ttLeaflet(slot) {
     TT.el = document.createElement('div'); TT.el.className = 'tt-lmap'; TT.el.setAttribute('role', 'img');
     TT.m = L.map(TT.el, { zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, tap: false, zoomSnap: 0.25 });
     TT.m.attributionControl.setPrefix(false);
-    const bases = makeBases(); let name = location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)');
-    try { const b = localStorage.getItem('pmr-base2'); if (b && bases[b] && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) name = b; } catch (e) {}
+    const bases = makeBases(), name = baseName(bases);
     bases[name].addTo(TT.m);
     TT.lay = L.layerGroup().addTo(TT.m);
   }
@@ -6494,8 +6633,7 @@ function duoMap(k) {
   let m = DUO.maps[k];
   if (!m) {
     m = DUO.maps[k] = L.map('duoMap' + k, { zoomControl: true, attributionControl: true });
-    const bases = makeBases(); let name = location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)');
-    try { const s = localStorage.getItem('pmr-base2'); if (s && bases[s] && !(location.protocol === 'file:' && s === T('Plan (OSM)'))) name = s; } catch (e) {}
+    const bases = makeBases(), name = baseName(bases);
     bases[name].addTo(m);
     m.on('moveend', () => { if (DUO.winds[k]) DUO.winds[k].remove(); if (S.laps && S.laps.taf) { const rg = duoRange(k); DUO.winds[k] = drawArrowsOn(m, rg, S.P.d[rg[0]], true); } });
   }
@@ -7577,7 +7715,8 @@ async function lpGpx(id) {
 /* Vignettes sur fond de carte (v2.0) : tuiles du fond choisi (pmr-base2) dessinées sur un canvas 320 × 236 avec la trace,
    gardées en JPEG dans IndexedDB (store pois, clé thumb1|<fond>|<id>). Tuile refusée (CORS, hors ligne) : on garde le dessin SVG. */
 const LP_MAP_W = 320, LP_MAP_H = 236;
-function lpBaseName() { let name = location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)'); try { const b = localStorage.getItem('pmr-base2'); if (b && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) name = b; } catch (e) {} return name; }
+function lpBaseName() { let name = baseDef(); try { const b = localStorage.getItem('pmr-base2'); if (b && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) name = b; } catch (e) {} if ((name === SGL_NAME && !sglOk()) || !LP_BASES.includes(name)) name = sglOk() ? SGL_NAME : location.protocol === 'file:' ? T('Vélo (CyclOSM)') : T('Plan (OSM)'); return name; }
+const LP_BASES = [SGL_NAME, T('Plan (OSM)'), T('Vélo (CyclOSM)'), 'Satellite (Esri)'];
 function lpMapKey(id) { return lpBaseName() + '|' + id; }
 async function lpMapsLoad() {
   if (LP.mapsLoaded) return; LP.mapsLoaded = true; const base = lpBaseName();
@@ -7595,12 +7734,18 @@ async function lpMapDraw(pts) { // null si une tuile manque ou si le canvas est 
   while (z > 2 && (wx * 256 * 2 ** z > LP_MAP_W - 2 * pad || wy * 256 * 2 ** z > LP_MAP_H - 2 * pad)) z--;
   const scale = 256 * 2 ** z, cx = ((lo0 + lo1) / 2 + 180) / 360 * scale, cy = (lat2y(la0) + lat2y(la1)) / 2 * scale, ox = cx - LP_MAP_W / 2, oy = cy - LP_MAP_H / 2, n = 2 ** z;
   const cv = document.createElement('canvas'); cv.width = LP_MAP_W; cv.height = LP_MAP_H; const c = cv.getContext('2d'); c.fillStyle = '#eef0e6'; c.fillRect(0, 0, LP_MAP_W, LP_MAP_H);
+  if (base === SGL_NAME) { // fond Sillage : rendu MapLibre hors écran au même cadrage (zoom MapLibre = zoom 256 px − 1)
+    const lon = cx / scale * 360 - 180, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * cy / scale))) / RAD;
+    const im = await sglShot({ lon, lat, zoom: z - 1, w: LP_MAP_W, h: LP_MAP_H, pr: 1 }); if (!im) return null;
+    c.drawImage(im, 0, 0, LP_MAP_W, LP_MAP_H);
+  } else {
   const jobs = []; let miss = 0;
   for (let tx = Math.floor(ox / 256); tx * 256 < ox + LP_MAP_W; tx++) for (let ty = Math.floor(oy / 256); ty * 256 < oy + LP_MAP_H; ty++) {
     if (ty < 0 || ty >= n) continue; const url = lpTileUrl(base, z, ((tx % n) + n) % n, ty); if (!url) return null;
     jobs.push(loadImg(url, 25000).then(im => { if (im) c.drawImage(im, tx * 256 - ox, ty * 256 - oy, 256.5, 256.5); else miss++; }));
   }
   await Promise.all(jobs); if (miss) return null;
+  }
   const P = pts.map(q => [(q[1] + 180) / 360 * scale - ox, lat2y(q[0]) * scale - oy]);
   c.lineJoin = c.lineCap = 'round'; c.beginPath(); P.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]));
   c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 7; c.stroke(); c.strokeStyle = '#14201b'; c.lineWidth = 3.2; c.stroke();
@@ -7688,7 +7833,7 @@ window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dropOverlay').hidden = true; handleFile(e.dataTransfer.files[0]); });
 let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.tl) { renderChart(); drawPlanWx(); } }, 150); });
 // thème : clair, sombre ou automatique (comme l'appareil), gardé dans le navigateur 
-function redrawTheme() { if (S.tl) { const rc = $('#roseAll'); if (rc && S.rose) roseCanvas(rc, S.rose, 172, 96);
+function redrawTheme() { try { SGL.retheme(); } catch (e) {} if (S.tl) { const rc = $('#roseAll'); if (rc && S.rose) roseCanvas(rc, S.rose, 172, 96);
   if (S.roses) S.roses.forEach((r, k) => { const c = $('#rose' + k); if (c && r) roseCanvas(c, r, 150, 84); }); renderChart(); renderMap(); drawPlanWx(); } }
 function setTheme(t) {
   if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
@@ -8325,12 +8470,14 @@ function pmInitMap(rot) {
   // un zoom au pincement ; dessiné sur un canvas, il bouge avec les tuiles (06/11/2026)
   PM.map = L.map('pmMap', Object.assign({ zoomControl: !MAP_TOUCH, attributionControl: true, preferCanvas: true },
     rot ? { rotate: true, bearing: 0, rotateControl: false, touchRotate: true, shiftKeyRotate: true } : {}));
-  const bases = makeBases(); let bn = location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)');
-  try { const sv = localStorage.getItem('pmr-pm-base'); if (sv && bases[sv]) bn = sv; } catch (e) {}
+  const bases = makeBases();
+  let bn = baseDef();
+  // fond Sillage par défaut ; un fond choisi ensuite dans le menu est gardé (pmr-pm-base2)
+  try { const sv = localStorage.getItem('pmr-pm-base2'); if (sv && bases[sv]) bn = sv; } catch (e) {}
   bases[bn].addTo(PM.map);
   const pmLay = L.control.layers(bases, null, { position: 'topright' }).addTo(PM.map);
   const pmCtl = $('#mapPage .pm-ctl'); if (pmCtl) pmCtl.insertBefore(pmLay.getContainer(), $('#pmLocate'));
-  PM.map.on('baselayerchange', e => { try { localStorage.setItem('pmr-pm-base', e.name); } catch (er) {} });
+  PM.map.on('baselayerchange', e => { try { localStorage.setItem('pmr-pm-base2', e.name); } catch (er) {} });
   PM.layer = L.layerGroup().addTo(PM.map);
   let v = null; try { v = JSON.parse(localStorage.getItem('pmr-pm-view') || 'null'); } catch (e) {}
   if (v && isFinite(v.lat)) PM.map.setView([v.lat, v.lon], v.z); else PM.map.setView([46.6, 2.4], 6);

@@ -27,6 +27,10 @@ const LF = path.join(NM, 'leaflet', 'dist');
 cp(path.join(LF, 'leaflet.js'), path.join(WWW, 'vendor', 'leaflet', 'leaflet.js'));
 cp(path.join(LF, 'leaflet.css'), path.join(WWW, 'vendor', 'leaflet', 'leaflet.css'));
 for (const f of fs.readdirSync(path.join(LF, 'images'))) cp(path.join(LF, 'images', f), path.join(WWW, 'vendor', 'leaflet', 'images', f));
+// MapLibre GL (fond de carte « Sillage ») : embarqué comme Leaflet, au lieu de jsDelivr
+const ML = path.join(NM, 'maplibre-gl', 'dist');
+cp(path.join(ML, 'maplibre-gl.js'), path.join(WWW, 'vendor', 'maplibre', 'maplibre-gl.js'));
+cp(path.join(ML, 'maplibre-gl.css'), path.join(WWW, 'vendor', 'maplibre', 'maplibre-gl.css'));
 
 const FONTS = [['archivo', [400, 500, 600, 700, 800]], ['ibm-plex-mono', [400, 500]]];
 let fontCss = '/* Archivo et IBM Plex Mono (SIL Open Font License), alphabets latin et latin étendu */\n';
@@ -73,6 +77,8 @@ swapRe('lien du manifeste', /<link rel="manifest" href="[^"]+">\n?/, '');
 swapRe('Google Fonts', /<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">\n<link rel="preconnect" href="https:\/\/fonts\.gstatic\.com" crossorigin>\n<link href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]+" rel="stylesheet">/, '<link rel="stylesheet" href="vendor/fonts.css">');
 swap('Leaflet CSS', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css', 'vendor/leaflet/leaflet.css');
 swap('Leaflet JS', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', 'vendor/leaflet/leaflet.js');
+swap('MapLibre JS', 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js', 'vendor/maplibre/maplibre-gl.js');
+swap('MapLibre CSS', 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css', 'vendor/maplibre/maplibre-gl.css');
 // « Mot de passe oublié ? » : le lien de l'e-mail ne peut pas revenir dans l'app → page web
 swap('redirection du mot de passe oublié', 'redirectTo: location.origin + location.pathname', `redirectTo: (window.SILLAGE_WEB || location.origin + location.pathname)`);
 // Admin : reste une page web (ouverte dans le navigateur du téléphone)
