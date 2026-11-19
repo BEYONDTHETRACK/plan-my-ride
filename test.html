@@ -5896,6 +5896,53 @@ async function poiEnsure(force) {
    IndexedDB (store `pois`, clé « places| » + signature). Affichées sous les graphes de chaque journée. */
 const PLACES = { key: '', list: [], seq: 0, ctl: null };
 const PLACE_RANK = { city: 2, town: 1, village: 0 };
+/* Villes, bourgs et villages des graphes du jour (19/11/2026) : lus dans les tuiles vectorielles OpenFreeMap
+   (couche place des données OpenMapTiles, zoom 10 : villages compris), celles du fond de carte Sillage. Overpass
+   ne répondait plus (overpass-api.de en erreur 502, autre serveur muet) et les villes manquaient sur les graphes. */
+const PL_Z = 10;
+let PL_LIB = null, PL_TPL = null;
+function plLib() {
+  if (!PL_LIB) PL_LIB = Promise.all([import('https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@2.0.3/+esm'), import('https://cdn.jsdelivr.net/npm/pbf@4.0.1/+esm')])
+    .then(([a, b]) => ({ VT: a.VectorTile, Pbf: b.default })).catch(e => { PL_LIB = null; throw e; });
+  return PL_LIB;
+}
+function plTpl() {
+  if (!PL_TPL) PL_TPL = fetch('https://tiles.openfreemap.org/planet').then(r => r.json()).then(j => j.tiles[0]).catch(e => { PL_TPL = null; throw e; });
+  return PL_TPL;
+}
+async function placesFromTiles(P, signal) {
+  const [{ VT, Pbf }, tpl] = await Promise.all([plLib(), plTpl()]);
+  const n = 2 ** PL_Z, d = 0.03, tiles = new Set();
+  const tx = lon => Math.floor((lon + 180) / 360 * n), ty = lat => { const r = lat * RAD; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n); };
+  const add = p => { for (const a of [-d, d]) for (const b of [-d, d]) tiles.add(tx(p.lon + b) + '/' + ty(p.lat + a)); };
+  for (let i = 0; i < P.n; i += 4) add(P.pts[i]);
+  add(P.pts[P.n - 1]);
+  const list = [...tiles], out = new Map(); let k = 0, failed = 0;
+  const work = async () => {
+    while (k < list.length) {
+      if (signal.aborted) return;
+      const [x, y] = list[k++].split('/').map(Number);
+      try {
+        const r = await fetch(tpl.replace('{z}', PL_Z).replace('{x}', x).replace('{y}', y), { signal });
+        if (!r.ok) { if (r.status !== 404 && r.status !== 204) failed++; continue; }
+        const L = new VT(new Pbf(await r.arrayBuffer())).layers.place; if (!L) continue;
+        for (let i = 0; i < L.length; i++) {
+          const f = L.feature(i), pr = f.properties;
+          if (!/^(city|town|village)$/.test(pr.class)) continue;
+          const name = pr['name:latin'] || pr.name; if (!name) continue;
+          const g = f.loadGeometry()[0][0], yy = (y + g.y / L.extent) / n;
+          const lon = (x + g.x / L.extent) / n * 360 - 180, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * yy))) / RAD;
+          const id = pr.class + '|' + name + '|' + lat.toFixed(3) + ',' + lon.toFixed(3);
+          if (!out.has(id)) out.set(id, { id, lat, lon, name, place: pr.class, pop: pr.class === 'city' ? 100000 : pr.class === 'town' ? 10000 : Math.max(1, 1000 - (pr.rank || 0) * 10) });
+        }
+      } catch (e) { if (signal.aborted) return; failed++; }
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, work));
+  if (signal.aborted) throw new Error(T("annulé"));
+  if (failed > list.length / 4) throw new Error('tuiles');
+  return [...out.values()];
+}
 async function placesEnsure() {
   if (!S.P || S.mode !== 'ultra') return;
   const key = 'places4|' + routeSig(); // places4 : requête par rectangles
@@ -5907,6 +5954,14 @@ async function placesEnsure() {
   try { cached = await idbRun('pois', 'readonly', st => st.get(key)); } catch (e) {}
   if (seq !== PLACES.seq) return;
   if (cached && Date.now() - cached.at < 30 * 864e5) { PLACES.list = attachToRoute(cached.items).filter(p => p.off <= 2000); drawPlanWx(); return; }
+  // d'abord les tuiles vectorielles OpenFreeMap (couche place), rapides et toujours là ; Overpass seulement en secours
+  try {
+    const items = await placesFromTiles(S.P, ctl.signal);
+    if (seq !== PLACES.seq) return;
+    PLACES.list = attachToRoute(items).filter(p => p.off <= 2000); drawPlanWx();
+    try { await idbRun('pois', 'readwrite', st => st.put({ key, at: Date.now(), items })); } catch (e) {}
+    return;
+  } catch (e) { if (seq !== PLACES.seq || ctl.signal.aborted) return; }
   // par rectangles (40 km de trace chacun, élargis de ~3 km) : requête par zone, très rapide pour le serveur
   // (un « around » sur des centaines de points est trop lent) ; le tri à 2 km de la trace se fait ensuite ici.
   const P = S.P, boxes = [];
