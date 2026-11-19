@@ -5954,9 +5954,13 @@ async function placesEnsure() {
   try { cached = await idbRun('pois', 'readonly', st => st.get(key)); } catch (e) {}
   if (seq !== PLACES.seq) return;
   if (cached && Date.now() - cached.at < 30 * 864e5) { PLACES.list = attachToRoute(cached.items).filter(p => p.off <= 2000); drawPlanWx(); return; }
-  // d'abord les tuiles vectorielles OpenFreeMap (couche place), rapides et toujours là ; Overpass seulement en secours
+  // d'abord les packs déjà sur l'appareil (hors ligne), puis les tuiles vectorielles OpenFreeMap (couche place),
+  // rapides et toujours là ; Overpass seulement en secours
   try {
-    const items = await placesFromTiles(S.P, ctl.signal);
+    let items = null;
+    try { items = await placesFromPacks(S.P); } catch (e) { items = null; }
+    if (seq !== PLACES.seq) return;
+    if (!items) items = await placesFromTiles(S.P, ctl.signal);
     if (seq !== PLACES.seq) return;
     PLACES.list = attachToRoute(items).filter(p => p.off <= 2000); drawPlanWx();
     try { await idbRun('pois', 'readwrite', st => st.put({ key, at: Date.now(), items })); } catch (e) {}
@@ -9221,6 +9225,33 @@ $('#pkLater').addEventListener('click', () => { $('#pkDlg').close(); $('#pkLater
 $('#pkX').addEventListener('click', () => { $('#pkDlg').close(); $('#pkLater').hidden = false; });
 const pkPm = rows => rows.filter(r => PM_TYPES[r.type]).map(r => ({ src: 'osm', ref: r.id, type: r.type, name: r.name || '', lat: r.lat, lon: r.lon, tags: { ...(r.t || {}), ...(r.name ? { name: r.name } : {}) } }));
 // Page Ultra : portions dont tous les carrés sont couverts par un pack (même logique que poiFromBase).
+/* Villes des graphes du jour lues dans les packs déjà sur l'appareil (19/11/2026) : marche hors ligne.
+   Seulement si tous les carrés de la trace ont un pack gardé qui contient les villes (type « ville », packs refaits le
+   19/11/2026) ; sinon null et placesEnsure passe aux tuiles du fond de carte. Nom latin pour les écritures non latines. */
+const PL_LATIN = /^[\u0000-\u024F\u1E00-\u1EFF\s'’.\-()]+$/;
+async function placesFromPacks(P) {
+  if (!PK_ON || !P) return null;
+  await pkIndex(); if (!PK.idx?.packs?.length) return null;
+  const keys = new Set(), d = 0.03;
+  for (let i = 0; i < P.n; i += 4) { const p = P.pts[i]; for (const a of [-d, d]) for (const b of [-d, d]) keys.add(Math.floor((p.lat + a) * 10) + ':' + Math.floor((p.lon + b) * 10)); }
+  const packs = new Map();
+  for (const k of keys) { const ps = pkPacksFor(...pkTileRect(k)); if (!ps.length) return null; for (const p of ps) packs.set(p.file, p); }
+  await pkStored();
+  for (const p of packs.values()) if (!(p.types && p.types.ville) || !PK.stored.has(p.file)) return null;
+  const groups = new Map();
+  for (const k of keys) { const [a, o] = k.split(':').map(Number), g = Math.floor(a / 20) + ':' + Math.floor(o / 20); (groups.get(g) || groups.set(g, []).get(g)).push(k); }
+  const out = new Map();
+  for (const ks of groups.values()) {
+    const got = await pkTiles(ks);
+    for (const rows of got.values()) for (const r of rows) {
+      if (r.type !== 'ville' || out.has(r.id)) continue;
+      const t = r.t || {}, nm = r.name || t.name; if (!nm) continue;
+      const name = PL_LATIN.test(nm) ? nm : (t['name:fr'] || t['name:en'] || t.int_name || nm);
+      out.set(r.id, { id: r.id, lat: r.lat, lon: r.lon, name, place: t.place || 'village', pop: +t.population || 0 });
+    }
+  }
+  return [...out.values()];
+}
 async function poiFromPacks(P, chunks, radius) {
   if (!PK_ON || !chunks.length) return null;
   await pkIndex(); if (!PK.idx.packs.length) return null;
@@ -9242,6 +9273,7 @@ async function poiFromPacks(P, chunks, radius) {
   for (const ks of groups.values()) {
     const got = await pkTiles(ks);
     for (const rows of got.values()) for (const r of rows) {
+      if (r.type === 'ville') continue; // villes et villages : pour les graphes du jour (placesFromPacks), pas des ravitos
       const tags = { ...(r.t || {}), ...(r.name ? { name: r.name } : {}) }, cls = classifyPoi(tags); if (!cls) continue;
       items.push({ id: r.id.replace('/', ''), lat: r.lat, lon: r.lon, g: cls[0], type: cls[1], name: r.name || tags.brand || '', oh: tags.opening_hours || '',
         web: tags.website || tags['contact:website'] || '', tel: tags.phone || tags['contact:phone'] || '' });

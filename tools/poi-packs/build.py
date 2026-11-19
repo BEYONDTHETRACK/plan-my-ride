@@ -7,7 +7,8 @@ une ligne par point, mêmes champs que la table Supabase `osm_poi` :
   {"id": "node/123", "type": "fontaine", "name": "…", "lat": 48.1, "lon": 7.7, "t": {…}}
 
 Les types reprennent ceux de l'app : pmClassify (Carte des points) puis les types
-ajoutés pour la page Ultra (carburant, hebergement, pharmacie, commerce).
+ajoutés pour la page Ultra (carburant, hebergement, pharmacie, commerce),
+plus « ville » (place = city / town / village, depuis le 19/11/2026).
 
 Utilisation : build.py <entrée.geojsonseq> <sortie.ndjson.gz> <code-pays>
 Affiche à la fin une ligne JSON de résumé (nombre de points par type).
@@ -20,11 +21,15 @@ import sys
 KEEP = ("name", "opening_hours", "drinking_water", "website", "phone", "contact:phone", "contact:website",
         "addr:street", "addr:housenumber", "addr:postcode", "addr:city", "backcountry", "camp_site",
         "shelter_type", "bicycle", "fee", "access", "seasonal", "capacity", "cuisine", "brand",
-        "amenity", "shop", "tourism", "man_made")
+        "amenity", "shop", "tourism", "man_made",
+        "place", "population", "name:fr", "name:en", "int_name")
 
 
 def classify(t):
     a, s, tr = t.get("amenity", ""), t.get("shop", ""), t.get("tourism", "")
+    # Villes, bourgs et villages (19/11/2026) : graphes du jour et roadbook de la page Ultra, même hors ligne
+    if t.get("place") in ("city", "town", "village") and t.get("name") and not (a or s or tr):
+        return "ville"
     # Carte des points (pmClassify dans test.html)
     if a in ("drinking_water", "water_point") or ((a == "fountain" or t.get("man_made") == "water_tap") and t.get("drinking_water") == "yes"):
         return "fontaine"
