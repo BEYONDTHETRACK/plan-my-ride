@@ -7,6 +7,11 @@ name: Packs de points OSM (monde)
 
 on:
   workflow_dispatch:   # lancement à la main seulement (Actions → Packs de points OSM (monde) → Run workflow)
+    inputs:
+      only:
+        description: "Seulement ces zones (noms de fichier sans .ndjson.gz, séparés par des virgules ; vide = toutes)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -22,6 +27,8 @@ jobs:
       batches: ${{ steps.list.outputs.batches }}
     steps:
       - id: list
+        env:
+          ONLY: ${{ inputs.only }}
         run: |
           curl -fsSL --retry 10 --retry-delay 30 --retry-all-errors --connect-timeout 30 -o idx.json https://download.geofabrik.de/index-v1-nogeom.json
           python3 - <<'EOF'
@@ -50,6 +57,8 @@ jobs:
               cc = ("US-" + p["id"].upper()[:20]) if par == "us" else ("-".join(iso) if iso else p["id"])
               rows.append({"id": p["id"], "name": p.get("name", p["id"]), "cc": cc, "url": p["urls"]["pbf"],
                            "slug": ("us-" if par == "us" else "") + p["id"]})
+          only = {x.strip().removesuffix(".ndjson.gz") for x in os.environ.get("ONLY", "").split(",") if x.strip()}
+          if only: rows = [r for r in rows if r["slug"] in only]
           rows.sort(key=lambda r: r["slug"])
           n = 4
           batches = [{"b": i // n, "regions": rows[i:i + n]} for i in range(0, len(rows), n)]
@@ -79,12 +88,17 @@ jobs:
           mkdir -p out
           echo "$REGIONS" > regions.json
           python3 - <<'EOF'
-          import json, subprocess, os, sys
+          import json, subprocess, os, sys, time
           for r in json.load(open("regions.json")):
               slug, cc = r["slug"], r["cc"]
               print("::group::" + r["name"], flush=True)
               try:
-                  subprocess.run(["curl", "-fsSL", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "--connect-timeout", "30", "-o", "in.osm.pbf", r["url"]], check=True)
+                  ok = False
+                  for essai in range(3):  # Geofabrik refuse parfois les connexions : on réessaie après une pause
+                      if subprocess.run(["curl", "-fsSL", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "--connect-timeout", "30", "-o", "in.osm.pbf", r["url"]]).returncode == 0:
+                          ok = True; break
+                      time.sleep(120)
+                  if not ok: raise RuntimeError("téléchargement impossible")
                   subprocess.run(["osmium", "tags-filter", "in.osm.pbf", "-e", "tools/poi-packs/filter.txt", "-o", "f.osm.pbf", "--overwrite"], check=True)
                   os.remove("in.osm.pbf")
                   subprocess.run(["osmium", "export", "f.osm.pbf", "-f", "geojsonseq", "-a", "type,id", "--geometry-types=point,polygon", "-o", "f.geojsonseq", "--overwrite"], check=True)
