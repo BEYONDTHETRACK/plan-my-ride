@@ -1773,6 +1773,7 @@ html[data-motion="reduce"] #tour .tour-ring{transition:none}
 /* démo en accès libre : copie très réduite de l'app, sans compte ni connexion */
 html.demo-web body.guest #libPage .lp-tools{display:flex}html.demo-web #libPage .lp-search,html.demo-web #libPage .lp-bar{display:none}
 html.demo-web #tabOut,html.demo-web #tabMe,html.demo-web .rail-admin,html.demo-web #pmAdd,html.demo-web #outAll,html.demo-web .lp-imp,html.demo-web label.imp-btn,html.demo-web #loginLink,html.demo-web #logoutLink,html.demo-web #meDel,html.demo-web #alBox,html.demo-web #exportImg,html.demo-web #exportImg2,html.demo-web .adm{display:none!important}
+.sgl{position:absolute;inset:0;z-index:0;pointer-events:none}.sgl .maplibregl-canvas{outline:none}
 </style>
 </head>
 <body>
@@ -3989,6 +3990,89 @@ function makeBases() {
     'Satellite (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: esriAttr + ', Maxar, Earthstar Geographics' })
   };
 }
+/* Fond de carte « Sillage » (19/11/2026, page Carte, test.html) : carte vectorielle OpenFreeMap (données OpenStreetMap,
+   gratuit, sans clé) + relief AWS Terrain Tiles, dessinée par MapLibre GL aux couleurs Sillage (thème clair / sombre).
+   MapLibre (jsDelivr) n'est chargé que quand ce fond est choisi. La carte MapLibre est un calque sous les volets Leaflet,
+   hors du volet tourné par leaflet-rotate : elle suit la vue Leaflet (centre, zoom − 1, cap) à chaque mouvement. */
+const SGL_JS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+const SGL_CSS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css';
+let sglP = null;
+function sglLoad() {
+  if (sglP) return sglP;
+  if (!document.querySelector('link[data-sgl]')) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = SGL_CSS; l.dataset.sgl = '1'; document.head.appendChild(l); }
+  return (sglP = loadScript(SGL_JS).then(() => !!window.maplibregl).catch(() => { sglP = null; return false; }));
+}
+const SGL_PAL = {
+  light: { bg: '#EEF0EA', forest: '#D3E1CC', grass: '#E2EADB', farm: '#ECEEE4', urban: '#E6E3DD', rock: '#E4E2DC', water: '#B9D3E6', waterLine: '#8FB6D4', waterLabel: '#3E6E94', build: '#DCD8D1', minor: '#FFFFFF', minorCase: '#D3D6CF', major: '#FFF3D6', majorCase: '#E0C88E', hwy: '#F6D58A', hwyCase: '#C9A24A', path: '#2E7D4F', ink: '#14201B', ink2: '#4C5852', halo: '#F6F7F3', border: '#9A7FB0', shade: '#14201B', hl: '#FFFFFF', ex: 0.3 },
+  dark: { bg: '#18221D', forest: '#1F3127', grass: '#1D2A23', farm: '#1B2620', urban: '#232A26', rock: '#252B27', water: '#14324A', waterLine: '#235A80', waterLabel: '#8CC3EC', build: '#2A332E', minor: '#3A463F', minorCase: '#1B2621', major: '#5A4F33', majorCase: '#2A2418', hwy: '#8A6A22', hwyCase: '#3C2E10', path: '#6FCF97', ink: '#EEF1EC', ink2: '#A8B3AC', halo: '#121B17', border: '#7E6A96', shade: '#000000', hl: '#6F8A7C', ex: 0.35 }
+};
+const sglDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+function sglStyle(p) {
+  const f = ['Noto Sans Regular'], fb = ['Noto Sans Bold'], fi = ['Noto Sans Italic'];
+  const cls = a => ['in', ['get', 'class'], ['literal', a]];
+  const road = (id, c, w, filt, mz) => Object.assign({ id, type: 'line', source: 'om', 'source-layer': 'transportation', filter: filt, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': c, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom']].concat(w) } }, mz ? { minzoom: mz } : {});
+  return {
+    version: 8, glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sources: {
+      om: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
+      dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 13 }
+    },
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': p.bg } },
+      { id: 'lc', type: 'fill', source: 'om', 'source-layer': 'landcover', paint: { 'fill-color': ['match', ['get', 'class'], 'wood', p.forest, 'grass', p.grass, 'farmland', p.farm, 'rock', p.rock, 'ice', '#F4F7F8', p.bg], 'fill-opacity': 0.9 } },
+      { id: 'park', type: 'fill', source: 'om', 'source-layer': 'park', paint: { 'fill-color': p.grass, 'fill-opacity': 0.5 } },
+      { id: 'lu', type: 'fill', source: 'om', 'source-layer': 'landuse', filter: cls(['residential', 'commercial', 'industrial', 'retail', 'suburb', 'neighbourhood']), paint: { 'fill-color': p.urban, 'fill-opacity': 0.75 } },
+      { id: 'shade', type: 'hillshade', source: 'dem', paint: { 'hillshade-shadow-color': p.shade, 'hillshade-highlight-color': p.hl, 'hillshade-accent-color': p.shade, 'hillshade-exaggeration': p.ex, 'hillshade-illumination-direction': 315 } },
+      { id: 'water', type: 'fill', source: 'om', 'source-layer': 'water', paint: { 'fill-color': p.water } },
+      { id: 'waterline', type: 'line', source: 'om', 'source-layer': 'water', paint: { 'line-color': p.waterLine, 'line-width': 0.6 } },
+      { id: 'river', type: 'line', source: 'om', 'source-layer': 'waterway', paint: { 'line-color': p.water, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 2.5] } },
+      { id: 'build', type: 'fill', source: 'om', 'source-layer': 'building', minzoom: 13, paint: { 'fill-color': p.build, 'fill-opacity': 0.85 } },
+      { id: 'bound', type: 'line', source: 'om', 'source-layer': 'boundary', filter: ['<=', ['get', 'admin_level'], 4], paint: { 'line-color': p.border, 'line-width': 1.2, 'line-dasharray': [3, 2], 'line-opacity': 0.7 } },
+      road('minor-c', p.minorCase, [12, 1.4, 16, 9], cls(['minor', 'service', 'tertiary']), 12),
+      road('major-c', p.majorCase, [8, 0.8, 12, 3, 16, 13], cls(['primary', 'secondary', 'trunk'])),
+      road('hwy-c', p.hwyCase, [6, 1, 12, 4.5, 16, 16], cls(['motorway'])),
+      Object.assign(road('path', p.path, [12, 0.8, 16, 2], cls(['path', 'track']), 12), { layout: {}, paint: { 'line-color': p.path, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 2], 'line-dasharray': [2, 1.5], 'line-opacity': 0.7 } }),
+      road('minor', p.minor, [10, 0.4, 12, 1, 16, 7], cls(['minor', 'service', 'tertiary']), 10),
+      road('major', p.major, [8, 0.5, 12, 2, 16, 11], cls(['primary', 'secondary', 'trunk'])),
+      road('hwy', p.hwy, [6, 0.6, 12, 3, 16, 13], cls(['motorway'])),
+      { id: 'water-lbl', type: 'symbol', source: 'om', 'source-layer': 'water_name', layout: { 'text-field': ['get', 'name'], 'text-font': fi, 'text-size': 13, 'text-letter-spacing': 0.06 }, paint: { 'text-color': p.waterLabel, 'text-halo-color': p.water, 'text-halo-width': 1 } },
+      { id: 'peak-dot', type: 'circle', source: 'om', 'source-layer': 'mountain_peak', minzoom: 11, filter: ['has', 'name'], paint: { 'circle-radius': 2.6, 'circle-color': p.ink2 } },
+      { id: 'peak', type: 'symbol', source: 'om', 'source-layer': 'mountain_peak', minzoom: 11, filter: ['has', 'name'], layout: { 'text-field': ['concat', ['get', 'name'], '\n', ['to-string', ['get', 'ele']], ' m'], 'text-font': f, 'text-size': 10.5, 'text-offset': [0, 0.8], 'text-anchor': 'top', 'text-optional': true }, paint: { 'text-color': p.ink2, 'text-halo-color': p.halo, 'text-halo-width': 1.4 } },
+      { id: 'place', type: 'symbol', source: 'om', 'source-layer': 'place', filter: cls(['city', 'town', 'village', 'hamlet']), layout: { 'text-field': ['get', 'name'], 'text-font': ['match', ['get', 'class'], ['city', 'town'], ['literal', fb], ['literal', f]], 'text-size': ['match', ['get', 'class'], 'city', 17, 'town', 14, 'village', 12, 11], 'symbol-sort-key': ['match', ['get', 'class'], 'city', 0, 'town', 1, 'village', 2, 3], 'text-padding': 4 }, paint: { 'text-color': p.ink, 'text-halo-color': p.halo, 'text-halo-width': 1.8 } }
+    ]
+  };
+}
+// Calque Leaflet « fond Sillage » : une carte MapLibre non interactive, recalée sur la vue Leaflet.
+const SillageGL = (typeof L !== 'undefined') && L.Layer.extend({
+  options: { minZoom: 2, maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · <a href="https://openfreemap.org">OpenFreeMap</a> · relief AWS Terrain Tiles' },
+  onAdd(map) {
+    this._map = map;
+    if (!this._el) { this._el = document.createElement('div'); this._el.className = 'sgl'; }
+    map.getContainer().insertBefore(this._el, map.getContainer().firstChild);
+    this._el.style.display = '';
+    this._sync = () => this._view();
+    this._anim = e => this._view(e.center, e.zoom);
+    map.on('move zoom rotate viewreset resize', this._sync); map.on('zoomanim', this._anim);
+    sglLoad().then(ok => {
+      if (!ok || !this._map) { this._el.innerHTML = `<p class="hint" style="padding:16px">${escH(T("La carte n'a pas pu se charger (connexion requise)."))}</p>`; return; }
+      if (!this._gl) {
+        this._dark = sglDark();
+        this._gl = new maplibregl.Map({ container: this._el, style: sglStyle(SGL_PAL[this._dark ? 'dark' : 'light']), interactive: false, attributionControl: false, fadeDuration: 0, center: [0, 0], zoom: 1 });
+        SGL.layers.add(this);
+      }
+      this._gl.resize(); this._view();
+    });
+  },
+  onRemove(map) { map.off('move zoom rotate viewreset resize', this._sync); map.off('zoomanim', this._anim); if (this._el) { this._el.style.display = 'none'; this._el.remove(); } this._map = null; },
+  _view(c, z) {
+    const m = this._map, g = this._gl; if (!m || !g) return;
+    c = c || m.getCenter(); z = z == null ? m.getZoom() : z;
+    if (g.getCanvas().width !== Math.round(this._el.clientWidth * devicePixelRatio)) g.resize();
+    g.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(0, z - 1), bearing: m.getBearing ? -m.getBearing() : 0 });
+  },
+  retheme() { const d = sglDark(); if (this._gl && d !== this._dark) { this._dark = d; this._gl.setStyle(sglStyle(SGL_PAL[d ? 'dark' : 'light'])); } }
+});
+const SGL = { layers: new Set(), retheme() { SGL.layers.forEach(l => l.retheme()); } };
 // écran tactile : pointeur « coarse », ou l'app iPhone / Android (le simulateur d'iPhone se déclare parfois en pointeur fin)
 const MAP_TOUCH = matchMedia('(pointer: coarse)').matches || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 function initMap() {
@@ -8346,7 +8430,7 @@ window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dropOverlay').hidden = true; handleFile(e.dataTransfer.files[0]); });
 let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.tl) { renderChart(); drawPlanWx(); } }, 150); });
 // thème : clair, sombre ou automatique (comme l'appareil), gardé dans le navigateur 
-function redrawTheme() { if (S.tl) { const rc = $('#roseAll'); if (rc && S.rose) roseCanvas(rc, S.rose, 172, 96);
+function redrawTheme() { try { SGL.retheme(); } catch (e) {} if (S.tl) { const rc = $('#roseAll'); if (rc && S.rose) roseCanvas(rc, S.rose, 172, 96);
   if (S.roses) S.roses.forEach((r, k) => { const c = $('#rose' + k); if (c && r) roseCanvas(c, r, 150, 84); }); renderChart(); renderMap(); drawPlanWx(); } }
 function setTheme(t) {
   if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
@@ -9234,12 +9318,15 @@ function pmInitMap(rot) {
   // un zoom au pincement ; dessiné sur un canvas, il bouge avec les tuiles (06/11/2026)
   PM.map = L.map('pmMap', Object.assign({ zoomControl: !MAP_TOUCH, attributionControl: true, preferCanvas: true },
     rot ? { rotate: true, bearing: 0, rotateControl: false, touchRotate: true, shiftKeyRotate: true } : {}));
-  const bases = makeBases(); let bn = location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)');
-  try { const sv = localStorage.getItem('pmr-pm-base'); if (sv && bases[sv]) bn = sv; } catch (e) {}
+  let bases = makeBases(); const SGN = 'Sillage';
+  if (SillageGL && window.WebGLRenderingContext) bases = Object.assign({ [SGN]: new SillageGL() }, bases);
+  let bn = bases[SGN] ? SGN : location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)');
+  // fond Sillage par défaut ; un fond choisi ensuite dans le menu est gardé (pmr-pm-base2)
+  try { const sv = localStorage.getItem('pmr-pm-base2'); if (sv && bases[sv]) bn = sv; } catch (e) {}
   bases[bn].addTo(PM.map);
   const pmLay = L.control.layers(bases, null, { position: 'topright' }).addTo(PM.map);
   const pmCtl = $('#mapPage .pm-ctl'); if (pmCtl) pmCtl.insertBefore(pmLay.getContainer(), $('#pmLocate'));
-  PM.map.on('baselayerchange', e => { try { localStorage.setItem('pmr-pm-base', e.name); } catch (er) {} });
+  PM.map.on('baselayerchange', e => { try { localStorage.setItem('pmr-pm-base2', e.name); } catch (er) {} });
   PM.layer = L.layerGroup().addTo(PM.map);
   let v = null; try { v = JSON.parse(localStorage.getItem('pmr-pm-view') || 'null'); } catch (e) {}
   if (v && isFinite(v.lat)) PM.map.setView([v.lat, v.lon], v.z); else PM.map.setView([46.6, 2.4], 6);
