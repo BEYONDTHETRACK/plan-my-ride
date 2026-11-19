@@ -4011,13 +4011,15 @@ function sglLoad() {
   return (sglP = loadScript(SGL_JS).then(() => !!window.maplibregl).catch(() => { sglP = null; return false; }));
 }
 const SGL_PAL = {
-  light: { bg: '#EEF0EA', forest: '#D3E1CC', grass: '#E2EADB', farm: '#ECEEE4', urban: '#E6E3DD', rock: '#E4E2DC', water: '#B9D3E6', waterLine: '#8FB6D4', waterLabel: '#3E6E94', build: '#DCD8D1', minor: '#FFFFFF', minorCase: '#D3D6CF', major: '#FFF3D6', majorCase: '#E0C88E', hwy: '#F6D58A', hwyCase: '#C9A24A', path: '#2E7D4F', ink: '#14201B', ink2: '#4C5852', halo: '#F6F7F3', border: '#9A7FB0', shade: '#14201B', hl: '#FFFFFF', ex: 0.3 },
-  dark: { bg: '#18221D', forest: '#1F3127', grass: '#1D2A23', farm: '#1B2620', urban: '#232A26', rock: '#252B27', water: '#14324A', waterLine: '#235A80', waterLabel: '#8CC3EC', build: '#2A332E', minor: '#3A463F', minorCase: '#1B2621', major: '#5A4F33', majorCase: '#2A2418', hwy: '#8A6A22', hwyCase: '#3C2E10', path: '#6FCF97', ink: '#EEF1EC', ink2: '#A8B3AC', halo: '#121B17', border: '#7E6A96', shade: '#000000', hl: '#6F8A7C', ex: 0.35 }
+  light: { bg: '#EEF0EA', forest: '#D3E1CC', grass: '#E2EADB', farm: '#ECEEE4', urban: '#E6E3DD', rock: '#E4E2DC', water: '#B9D3E6', waterLine: '#8FB6D4', waterLabel: '#3E6E94', build: '#DCD8D1', minor: '#FFFFFF', minorCase: '#D3D6CF', major: '#FFF3D6', majorCase: '#E0C88E', hwy: '#F6D58A', hwyCase: '#C9A24A', path: '#2E7D4F', cyc: '#1F7A4A', cycCase: '#FFFFFF', dirt: '#A47A45', ink: '#14201B', ink2: '#4C5852', halo: '#F6F7F3', border: '#9A7FB0', shade: '#14201B', hl: '#FFFFFF', ex: 0.3 },
+  dark: { bg: '#18221D', forest: '#1F3127', grass: '#1D2A23', farm: '#1B2620', urban: '#232A26', rock: '#252B27', water: '#14324A', waterLine: '#235A80', waterLabel: '#8CC3EC', build: '#2A332E', minor: '#3A463F', minorCase: '#1B2621', major: '#5A4F33', majorCase: '#2A2418', hwy: '#8A6A22', hwyCase: '#3C2E10', path: '#6FCF97', cyc: '#6FCF97', cycCase: '#14201B', dirt: '#C9A26E', ink: '#EEF1EC', ink2: '#A8B3AC', halo: '#121B17', border: '#7E6A96', shade: '#000000', hl: '#6F8A7C', ex: 0.35 }
 };
 const sglDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
 function sglStyle(p) {
   const f = ['Noto Sans Regular'], fb = ['Noto Sans Bold'], fi = ['Noto Sans Italic'];
   const cls = a => ['in', ['get', 'class'], ['literal', a]];
+  // piste cyclable : highway=cycleway, ou chemin réservé / conseillé aux vélos (bicycle=designated)
+  const CYC = ['all', cls(['path', 'track']), ['any', ['==', ['get', 'subclass'], 'cycleway'], ['==', ['get', 'bicycle'], 'designated']]];
   const road = (id, c, w, filt, mz) => Object.assign({ id, type: 'line', source: 'om', 'source-layer': 'transportation', filter: filt, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': c, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom']].concat(w) } }, mz ? { minzoom: mz } : {});
   return {
     version: 8, glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
@@ -4039,8 +4041,16 @@ function sglStyle(p) {
       road('minor-c', p.minorCase, [12, 1.4, 16, 9], cls(['minor', 'service', 'tertiary']), 12),
       road('major-c', p.majorCase, [8, 0.8, 12, 3, 16, 13], cls(['primary', 'secondary', 'trunk'])),
       road('hwy-c', p.hwyCase, [6, 1, 12, 4.5, 16, 16], cls(['motorway'])),
-      Object.assign(road('path', p.path, [12, 0.8, 16, 2], cls(['path', 'track']), 12), { layout: {}, paint: { 'line-color': p.path, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 2], 'line-dasharray': [2, 1.5], 'line-opacity': 0.7 } }),
-      road('minor', p.minor, [10, 0.4, 12, 1, 16, 7], cls(['minor', 'service', 'tertiary']), 10),
+      // sentiers (pas les pistes cyclables) : pointillés verts
+      { id: 'path', type: 'line', source: 'om', 'source-layer': 'transportation', minzoom: 12, filter: ['all', cls(['path']), ['!', CYC]], paint: { 'line-color': p.path, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 2], 'line-dasharray': [2, 1.5], 'line-opacity': 0.7 } },
+      // chemins (track) : pointillés couleur terre, plus marqués quand le revêtement est non goudronné
+      { id: 'track', type: 'line', source: 'om', 'source-layer': 'transportation', minzoom: 12, filter: ['all', cls(['track']), ['!', CYC]], paint: { 'line-color': p.dirt, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.9, 16, 2.6], 'line-dasharray': [3, 1.6], 'line-opacity': 0.85 } },
+      road('minor', p.minor, [10, 0.4, 12, 1, 16, 7], ['all', cls(['minor', 'service', 'tertiary']), ['!=', ['get', 'surface'], 'unpaved']], 10),
+      // petites routes non goudronnées : même largeur, tirets couleur terre sur le liseré
+      Object.assign(road('minor-dirt', p.dirt, [10, 0.4, 12, 1, 16, 5], ['all', cls(['minor', 'service', 'tertiary']), ['==', ['get', 'surface'], 'unpaved']], 10), { layout: { 'line-join': 'round' }, paint: { 'line-color': p.dirt, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 10, 0.4, 12, 1, 16, 5], 'line-dasharray': [2.2, 1.2] } }),
+      // pistes cyclables et voies vertes : trait vert plein avec liseré
+      { id: 'cyc-c', type: 'line', source: 'om', 'source-layer': 'transportation', minzoom: 11, filter: CYC, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': p.cycCase, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 6], 'line-opacity': 0.9 } },
+      { id: 'cyc', type: 'line', source: 'om', 'source-layer': 'transportation', minzoom: 11, filter: CYC, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': p.cyc, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 16, 3.4] } },
       road('major', p.major, [8, 0.5, 12, 2, 16, 11], cls(['primary', 'secondary', 'trunk'])),
       road('hwy', p.hwy, [6, 0.6, 12, 3, 16, 13], cls(['motorway'])),
       { id: 'water-lbl', type: 'symbol', source: 'om', 'source-layer': 'water_name', layout: { 'text-field': ['get', 'name'], 'text-font': fi, 'text-size': 13, 'text-letter-spacing': 0.06 }, paint: { 'text-color': p.waterLabel, 'text-halo-color': p.water, 'text-halo-width': 1 } },
