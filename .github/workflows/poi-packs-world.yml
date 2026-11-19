@@ -23,7 +23,7 @@ jobs:
     steps:
       - id: list
         run: |
-          curl -fsSL --retry 3 -o idx.json https://download.geofabrik.de/index-v1-nogeom.json
+          curl -fsSL --retry 10 --retry-delay 30 --retry-all-errors --connect-timeout 30 -o idx.json https://download.geofabrik.de/index-v1-nogeom.json
           python3 - <<'EOF'
           import json, os
           feats = [f["properties"] for f in json.load(open("idx.json"))["features"]]
@@ -84,7 +84,7 @@ jobs:
               slug, cc = r["slug"], r["cc"]
               print("::group::" + r["name"], flush=True)
               try:
-                  subprocess.run(["curl", "-fsSL", "--retry", "3", "-o", "in.osm.pbf", r["url"]], check=True)
+                  subprocess.run(["curl", "-fsSL", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "--connect-timeout", "30", "-o", "in.osm.pbf", r["url"]], check=True)
                   subprocess.run(["osmium", "tags-filter", "in.osm.pbf", "-e", "tools/poi-packs/filter.txt", "-o", "f.osm.pbf", "--overwrite"], check=True)
                   os.remove("in.osm.pbf")
                   subprocess.run(["osmium", "export", "f.osm.pbf", "-f", "geojsonseq", "-a", "type,id", "--geometry-types=point,polygon", "-o", "f.geojsonseq", "--overwrite"], check=True)
