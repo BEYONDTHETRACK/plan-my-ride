@@ -3997,7 +3997,7 @@ function baseDef() { return sglOk() ? SGL_NAME : location.protocol === 'file:' ?
 // fond enregistré (pmr-base2) s'il existe dans la liste, sinon le défaut
 function baseName(bases) { let n = baseDef(); try { const b = localStorage.getItem('pmr-base2'); if (b && bases[b] && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) n = b; } catch (e) {} return n; }
 // 19/11/2026 : Sillage devient le fond de toutes les cartes, une fois par appareil l'ancien choix est oublié
-try { if (!localStorage.getItem('pmr-sgl-def')) { localStorage.setItem('pmr-sgl-def', '1'); localStorage.removeItem('pmr-base2'); localStorage.removeItem('pmr-pm-base2'); } } catch (e) {}
+try { if (!localStorage.getItem('pmr-sgl-def2')) { localStorage.setItem('pmr-sgl-def2', '1'); localStorage.removeItem('pmr-base2'); localStorage.removeItem('pmr-pm-base2'); } } catch (e) {}
 /* Fond de carte « Sillage » (19/11/2026, page Carte, test.html) : carte vectorielle OpenFreeMap (données OpenStreetMap,
    gratuit, sans clé) + relief AWS Terrain Tiles, dessinée par MapLibre GL aux couleurs Sillage (thème clair / sombre).
    MapLibre (jsDelivr) n'est chargé que quand ce fond est choisi. La carte MapLibre est un calque sous les volets Leaflet,
