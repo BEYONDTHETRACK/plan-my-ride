@@ -3987,15 +3987,13 @@ function makeBases() {
   return Object.assign(out, {
     [T('Plan (OSM)')]: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: osmAttr }),
     [T('Vélo (CyclOSM)')]: L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { maxZoom: 20, subdomains: 'abc', attribution: osmAttr + ' · <a href="https://www.cyclosm.org">CyclOSM</a>' }),
-    [T('Relief (OpenTopoMap)')]: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, subdomains: 'abc', attribution: osmAttr + ', SRTM · © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)' }),
-    'Topo (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: esriAttr }),
     'Satellite (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: esriAttr + ', Maxar, Earthstar Geographics' })
   });
 }
 const SGL_NAME = 'Sillage';
 function sglOk() { return typeof SillageGL === 'function' && !!window.WebGLRenderingContext; }
 // fond par défaut de toutes les cartes : Sillage (sinon l'ancien défaut)
-function baseDef() { return sglOk() ? SGL_NAME : location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)'); }
+function baseDef() { return sglOk() ? SGL_NAME : location.protocol === 'file:' ? T('Vélo (CyclOSM)') : T('Plan (OSM)'); }
 // fond enregistré (pmr-base2) s'il existe dans la liste, sinon le défaut
 function baseName(bases) { let n = baseDef(); try { const b = localStorage.getItem('pmr-base2'); if (b && bases[b] && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) n = b; } catch (e) {} return n; }
 // 19/11/2026 : Sillage devient le fond de toutes les cartes, une fois par appareil l'ancien choix est oublié
@@ -8365,7 +8363,8 @@ async function lpGpx(id) {
 /* Vignettes sur fond de carte (v2.0) : tuiles du fond choisi (pmr-base2) dessinées sur un canvas 320 × 236 avec la trace,
    gardées en JPEG dans IndexedDB (store pois, clé thumb1|<fond>|<id>). Tuile refusée (CORS, hors ligne) : on garde le dessin SVG. */
 const LP_MAP_W = 320, LP_MAP_H = 236;
-function lpBaseName() { let name = baseDef(); try { const b = localStorage.getItem('pmr-base2'); if (b && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) name = b; } catch (e) {} if (name === SGL_NAME && !sglOk()) name = location.protocol === 'file:' ? 'Topo (Esri)' : T('Plan (OSM)'); return name; }
+function lpBaseName() { let name = baseDef(); try { const b = localStorage.getItem('pmr-base2'); if (b && !(location.protocol === 'file:' && b === T('Plan (OSM)'))) name = b; } catch (e) {} if ((name === SGL_NAME && !sglOk()) || !LP_BASES.includes(name)) name = sglOk() ? SGL_NAME : location.protocol === 'file:' ? T('Vélo (CyclOSM)') : T('Plan (OSM)'); return name; }
+const LP_BASES = [SGL_NAME, T('Plan (OSM)'), T('Vélo (CyclOSM)'), 'Satellite (Esri)'];
 function lpMapKey(id) { return lpBaseName() + '|' + id; }
 async function lpMapsLoad() {
   if (LP.mapsLoaded) return; LP.mapsLoaded = true; const base = lpBaseName();
