@@ -313,11 +313,11 @@ tr.night td:first-child{box-shadow:inset 3px 0 0 var(--elev-line)}
 /* Sortie : flèches sur la trace, taille et couleur selon la force du vent, pastille une flèche sur deux (20/11/2026) */
 .wa2{line-height:0}.wa2 svg{display:block;filter:drop-shadow(0 1px 1.2px rgba(0,0,0,.4))}
 /* animation : la flèche avance dans le sens du vent, plus vite et plus loin quand il souffle fort */
-.anim .wa .wmove{animation:wdrift var(--d,2s) ease-in-out infinite;animation-delay:var(--dl,0s)}
-.anim .wa .wmove.calm{animation-name:wbreath}
+.anim .wa .wmove,.anim .wa2 .wmove{animation:wdrift var(--d,2s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+.anim .wa .wmove.calm,.anim .wa2 .wmove.calm{animation-name:wbreath}
 @keyframes wdrift{0%{transform:translateY(var(--a,3px));opacity:.6}55%{transform:translateY(calc(var(--a,3px) * -1));opacity:1}100%{transform:translateY(var(--a,3px));opacity:.6}}
 @keyframes wbreath{0%,100%{opacity:.55}50%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.anim .wa .wmove{animation:none}}
+@media (prefers-reduced-motion:reduce){.anim .wa .wmove,.anim .wa2 .wmove{animation:none}}
 .wa b{display:inline-flex;align-items:center;gap:2px;font:600 10.5px/1 var(--f-mono);color:#15202a;background:rgba(255,255,255,.92);border-radius:7px;padding:2px 4px;box-shadow:0 0 0 1px rgba(0,0,0,.15);white-space:nowrap}
 .wa b .ww{margin-left:3px;padding-left:4px;border-left:1px solid rgba(0,0,0,.2)}
 .wa b small{font-size:8.5px;font-weight:500;color:#46525e;margin-left:1px}
@@ -4321,7 +4321,10 @@ function drawArrowsRide(map, rg, kOff, layer, showS) {
     const tip = T("<b>km {0}</b> · passage {1}<br>{2}{3} · {4} °C{5}<br>Vent de {6} : {7} km/h ({8}){9}<br>Pour vous : {10}", [fD(P.d[i] - (kOff || 0)), hm.format(new Date(t)), skyLabel(w.code, w.day), isFinite(w.cc) ? T(' (nuages {0} %)', [n0(w.cc)]) : '', fT(w.temp), w.pr >= 0.1 ? T(" · pluie {0} mm/h", [fR(w.pr)]) : '', compass(w.wd), fV(w.ws), lbl.toLowerCase(), isFinite(w.gust) ? T("<br>Rafales {0} km/h", [fV(w.gust)]) : '', relLabel(head).txt]);
     // la pointe de la flèche est sur la trace, le corps de la flèche arrive du côté d'où vient le vent
     const th = (w.wd + 180) % 360, R = sz, tipY = sz * 1.5 / 24, dx = Math.sin(th * RAD), dy = -Math.cos(th * RAD);
-    const html = `<div class="wa2" style="position:relative;width:${2 * R}px;height:${2 * R}px"><svg viewBox="0 0 24 24" width="${sz}" height="${sz}" style="position:absolute;left:${R - sz / 2}px;top:${R - tipY}px;transform-origin:50% ${tipY}px;transform:rotate(${th}deg)"><path d="${WARROW}" fill="${col}" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" paint-order="stroke"/></svg></div>`;
+    // animation : la flèche avance dans le sens du vent, plus vite et plus loin quand il souffle fort (comme avant)
+    const dur = clamp(2.8 - w.ws * 0.05, 0.55, 2.8).toFixed(2), amp = clamp(1.5 + w.ws * 0.12, 1.5, 5).toFixed(1);
+    const dl = (-((mk.i % 7) * 0.37) % dur).toFixed(2), calm = w.ws < 5 ? ' calm' : '';
+    const html = `<div class="wa2" style="position:relative;width:${2 * R}px;height:${2 * R}px"><div style="position:absolute;left:${R - sz / 2}px;top:${R - tipY}px;width:${sz}px;height:${sz}px;transform-origin:50% ${tipY}px;transform:rotate(${th}deg)"><svg class="wmove${calm}" viewBox="0 0 24 24" width="${sz}" height="${sz}" style="--d:${dur}s;--a:${amp}px;--dl:${dl}s"><path d="${WARROW}" fill="${col}" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" paint-order="stroke"/></svg></div></div>`;
     L.marker([p.lat, p.lon], { icon: L.divIcon({ html, className: '', iconSize: [2 * R, 2 * R], iconAnchor: [R, R] }), keyboard: false, interactive: true }).bindTooltip(tip).addTo(layer);
     if (!mk.pill) continue;
     const sky = showS ? skySvg(w, 15) : '';
