@@ -4254,14 +4254,18 @@ function sampleRangeOf(r) {
   if (k0 < 0) k0 = 0; if (k1 <= k0) k1 = Math.min(s.length - 1, k0 + 1);
   return [k0, k1];
 }
+// Page Sortie, onglet « Vent ressenti » : trace en filet clair à contour sombre (les flèches portent le vent) ; les autres onglets gardent la trace colorée
+const ridePlain = () => S.mode === 'ride' && !['temp', 'rain', 'sun'].includes(S.metric);
 function renderMap() {
   if (!map) return;
   if (routeLayer) routeLayer.remove();
   routeLayer = L.layerGroup().addTo(map);
   const P = S.P, ll = P.pts.map(p => [p.lat, p.lon]);
-  L.polyline(ll, { color: '#ffffff', weight: 9, opacity: .85 }).addTo(routeLayer);
+  const plain = ridePlain();
+  if (plain) { L.polyline(ll, { color: '#0a1410', weight: 5.5, opacity: .55 }).addTo(routeLayer); L.polyline(ll, { color: '#ffffff', weight: 3, opacity: .6 }).addTo(routeLayer); }
+  else L.polyline(ll, { color: '#ffffff', weight: 9, opacity: .85 }).addTo(routeLayer);
   const svs = S.samples.map((_, k) => S.wx ? sampleValue(k) : null), [sk0, sk1] = sampleRange();
-  for (let k = sk0; k < sk1; k++) {
+  for (let k = sk0; !plain && k < sk1; k++) {
     const a = S.samples[k].i, b = S.samples[k + 1].i;
     const sv = svs[k + 1] || svs[k];
     L.polyline(ll.slice(a, b + 1), { color: metricColor(sv), weight: 5, opacity: 1 }).addTo(routeLayer);
@@ -4572,9 +4576,11 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
   const P = S.P;
   c.lineJoin = c.lineCap = 'round';
   c.beginPath(); P.pts.forEach((p, i) => { const [x, y] = pt(p.lat, p.lon); i ? c.lineTo(x, y) : c.moveTo(x, y); });
-  c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 9; c.stroke();
+  const plainX = !o.rg && ridePlain();
+  if (plainX) { c.strokeStyle = 'rgba(10,20,16,.55)'; c.lineWidth = 5.5; c.stroke(); c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 3; c.stroke(); }
+  else { c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 9; c.stroke(); }
   const [sk0, sk1] = o.rg ? sampleRangeOf(o.rg) : sampleRange();
-  for (let k = sk0; k < sk1; k++) {
+  for (let k = sk0; !plainX && k < sk1; k++) {
     const a = S.samples[k].i, b = S.samples[k + 1].i, sv = S.svs ? (S.svs[k + 1] || S.svs[k]) : null;
     c.beginPath(); for (let i = a; i <= b; i++) { const [x, y] = pt(P.pts[i].lat, P.pts[i].lon); i === a ? c.moveTo(x, y) : c.lineTo(x, y); }
     c.strokeStyle = metricColor(sv); c.lineWidth = 5; c.stroke();
