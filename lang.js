@@ -2,6 +2,12 @@
    {0}, {1}… = valeurs insérées par le code. Ajouter une langue : un objet de plus, puis LANGS dans test.html. */
 window.PMR_I18N = {
   en: {
+    /* Commute : écran Aller / Retour (20/11/2026) */
+    "air {0} °C": "air {0} °C",
+    "{0} % face": "{0} % head",
+    "{0} % travers": "{0} % cross",
+    "{0} % dos": "{0} % tail",
+    "{0} % calme": "{0} % calm",
     /* démo en accès libre et visite guidée (08/11/2026) */
     "Bienvenue dans la démo de Sillage": "Welcome to the Sillage demo",
     "Tu essaies Sillage sur des traces d'exemple, avec une météo d'exemple (pas une prévision). Cette visite te montre l'essentiel en une minute.": "You are trying Sillage on sample routes, with sample weather (not a forecast). This tour shows the essentials in one minute.",
