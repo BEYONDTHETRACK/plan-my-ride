@@ -2344,7 +2344,7 @@ body[data-mode="ride"] .chart-keys .ck-v1,body:not([data-mode="ride"]) .chart-ke
         <span class="ck-v2"><i style="background:var(--head)"></i>Vent de face (km/h, échelle de droite)</span>
         <span class="ck-v2"><i style="background:var(--tail)"></i>Vent de dos</span>
         <span class="ck-v2"><i style="background:color-mix(in srgb,var(--head) 45%,var(--sun))"></i>Vent de travers</span>
-        <span class="ck-v2"><i style="background:repeating-linear-gradient(90deg,var(--brand) 0 5px,transparent 5px 8px)"></i>Rafales</span>
+        <span class="ck-v2"><i style="background:repeating-linear-gradient(90deg,var(--muted) 0 5px,transparent 5px 8px)"></i>Rafales (pointillé, même couleur que le vent)</span>
         <span class="ck-v1"><i style="background:var(--elev-line)"></i>Altitude</span>
         <span class="ck-v1"><i style="background:var(--warm)"></i>Température ressentie</span>
         <span class="ck-v1"><i style="background:var(--rain)"></i>Pluie (mm/h)</span>
@@ -5132,11 +5132,21 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
       // rafales
       const gb = bins.filter(b => b.w && isFinite(b.w.gust));
       if (gb.length) {
-        const gc = cssVar('--brand');
-        c.save(); c.setLineDash([5, 4]); c.beginPath(); st = false;
-        bins.forEach(b => { if (!b.w || !isFinite(b.w.gust)) { st = false; return; } const x = X(b.km), y = Yv(b.w.gust); st ? c.lineTo(x, y) : c.moveTo(x, y); st = true; });
-        c.strokeStyle = gc; c.lineWidth = 1.8; c.stroke(); c.restore();
-        const gm = gb.reduce((m, b) => b.w.gust > m.w.gust ? b : m, gb[0]), gx = X(gm.km), gy = Yv(gm.w.gust);
+        // pointillé coloré comme le vent selon son sens (dos vert, face rouille, travers orange), tronçon par tronçon
+        c.save(); c.setLineDash([5, 4]); c.lineWidth = 2; c.lineJoin = 'round';
+        const gOk = b => b && b.w && isFinite(b.w.gust);
+        let dash = 0;
+        for (let a = 0; a < nb;) {
+          if (!gOk(bins[a])) { a++; continue; }
+          const k = cls(bins[a]); let z = a; while (z < nb && gOk(bins[z + 1]) && cls(bins[z + 1]) === k) z++;
+          const e = Math.min(nb, gOk(bins[z + 1]) ? z + 1 : z);
+          c.beginPath(); c.lineDashOffset = -dash;
+          for (let j = a; j <= e; j++) { const x = X(bins[j].km), y = Yv(bins[j].w.gust); j === a ? c.moveTo(x, y) : c.lineTo(x, y); if (j > a) dash += Math.hypot(x - X(bins[j - 1].km), y - Yv(bins[j - 1].w.gust)); }
+          c.strokeStyle = col[k]; c.stroke();
+          a = z + 1;
+        }
+        c.restore();
+        const gm = gb.reduce((m, b) => b.w.gust > m.w.gust ? b : m, gb[0]), gx = X(gm.km), gy = Yv(gm.w.gust), gc = col[cls(gm)];
         c.fillStyle = gc; c.beginPath(); c.arc(gx, gy, 3.5, 0, Math.PI * 2); c.fill();
         c.font = `600 10.5px ${mono}, monospace`; c.textBaseline = 'bottom';
         const gt = T('rafales ') + fV(gm.w.gust), gw = c.measureText(gt).width;
