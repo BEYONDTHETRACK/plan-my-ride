@@ -6480,7 +6480,10 @@ function drawDayWx(cv, cur) {
   const kmAtT = planKmAtT;
   {
     const isLap = !!cv.closest('#lapRows, #tafDuo'), d = (isLap ? LAPS.days : PLAN.days)[+cv.dataset.wx]; if (!d) return;
-    const sc = cv.closest('.plan-scroll'), W = sc ? Math.max(260, Math.max(sc.clientWidth, 700) - 24) : Math.max(260, cv.parentElement.clientWidth), H = 150, dpr = window.devicePixelRatio || 1;
+    // jours d'Ultra (20/11/2026, option A d'Antoine) : même dessin que le profil v2 — ressenti et ciel toutes les heures en haut,
+    // vent en aire colorée selon son sens posé sur le relief, rafales en trait, pluie en ruban sous le tracé
+    const v2 = !isLap, RB = v2 ? 22 : 0;
+    const sc = cv.closest('.plan-scroll'), W = sc ? Math.max(260, Math.max(sc.clientWidth, 700) - 24) : Math.max(260, cv.parentElement.clientWidth), H = v2 ? 262 : 150, dpr = window.devicePixelRatio || 1;
     cv.style.width = W + 'px'; cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr;
     const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
     const ink = cssVar('--ink'), muted = cssVar('--muted'), mono = cssVar('--f-mono').split(',')[0];
@@ -6492,7 +6495,7 @@ function drawDayWx(cv, cur) {
     for (let t = ta; t < tb; t += 1800e3) ptAdd(t); ptAdd(tb);
     // sans météo pour ce jour : relief, heures, km, soleil et villes quand même, avec un petit mot en haut
     const noWx = !pts.length;
-    const yT0 = 44, yT1 = H - 52; // zone température / pluie / relief ; en bas : heures, km, puis villes et bourgs
+    const yT0 = v2 ? 72 : 44, yT1 = H - 52 - RB, yB = yT1 + RB; // zone température / pluie / relief ; en bas : heures, km, puis villes et bourgs
     const temps = noWx ? [0] : pts.map(p => p.w.app);
     let tMin = Math.floor(Math.min(...temps)), tMax = Math.ceil(Math.max(...temps)); if (tMax - tMin < 6) { const m = (tMax + tMin) / 2; tMin = Math.floor(m - 3); tMax = Math.ceil(m + 3); }
     const Yt = v => yT1 - (v - tMin) / (tMax - tMin) * (yT1 - yT0);
@@ -6512,20 +6515,82 @@ function drawDayWx(cv, cur) {
     const Ye = e => yT1 - (e - eLo) / eR * (yT1 - yT0) * 0.9;
     c.beginPath(); c.moveTo(X(ta), yT1); ep.forEach(([x, e]) => c.lineTo(x, Ye(e))); c.lineTo(X(tb), yT1); c.closePath();
     c.fillStyle = cssVar('--elev'); c.globalAlpha = .75; c.fill(); c.globalAlpha = 1;
-    c.beginPath(); ep.forEach(([x, e], i) => i ? c.lineTo(x, Ye(e)) : c.moveTo(x, Ye(e))); c.strokeStyle = cssVar('--elev-line'); c.lineWidth = 1; c.stroke();
+    c.beginPath(); ep.forEach(([x, e], i) => i ? c.lineTo(x, Ye(e)) : c.moveTo(x, Ye(e)));
+    if (v2) { c.lineJoin = 'round'; c.strokeStyle = ink; c.globalAlpha = .55; c.lineWidth = 1.6; c.stroke(); c.globalAlpha = 1; } else { c.strokeStyle = cssVar('--elev-line'); c.lineWidth = 1; c.stroke(); }
     c.fillStyle = cssVar('--elev-line'); c.font = `10px ${mono}, monospace`; c.textAlign = 'left'; c.textBaseline = 'middle';
     c.fillText(fE(eHi) + ' ' + UL.m, l + pw + 5, Ye(eHi)); if (Ye(eLo) - Ye(eHi) > 14) c.fillText(fE(eLo) + ' ' + UL.m, l + pw + 5, Ye(eLo));
     // pluie par heure
     const hours = []; for (let h0 = Math.floor(ta / 3600e3) * 3600e3; h0 < tb; h0 += 3600e3) { const a = Math.max(ta, h0), b = Math.min(tb, h0 + 3600e3); if (b - a < 60e3) continue;
       const tm = (a + b) / 2, km = kmAtT(tm), w = S.wx ? wxAt(sIdx(km), tm) : null; hours.push({ a, b, tm, km, w }); }
+    if (!v2) {
     const pMax = Math.max(2, ...hours.map(x => x.w ? x.w.pr : 0)), rc = cssVar('--rain');
     c.font = `9.5px ${mono}, monospace`; c.textAlign = 'center';
     for (const x of hours) { if (!x.w || x.w.pr < 0.05) continue;
       const xa = X(x.a) + .75, bw = Math.max(2, X(x.b) - X(x.a) - 1.5), hh = Math.max(2, x.w.pr / pMax * (yT1 - yT0) * .6);
       c.globalAlpha = .8; c.fillStyle = rc; c.fillRect(xa, yT1 - hh, bw, hh); c.globalAlpha = 1;
       if (bw >= 22 && x.w.pr >= 0.1) { c.fillStyle = rc; c.textBaseline = 'bottom'; c.fillText(n1(x.w.pr), xa + bw / 2, yT1 - hh - 1); } }
+    }
+    // dessin des jours d'Ultra façon profil v2 (voir plus haut)
+    function dayWxV2() {
+      const rc = cssVar('--rain'), mono2 = `${mono}, monospace`;
+      // nuages : même strate en dégradé que le profil (temps à la place des km)
+      if (pts.some(p => isFinite(p.w.cc))) drawCloudCeiling(c, pts.map(p => ({ km: p.t, w: p.w })), X, l, yT0, pw, yT1 - yT0);
+      // ruban de pluie sous le tracé, une case par heure
+      const ry = yT1 + 3, rh = 16;
+      c.globalAlpha = .5; c.fillStyle = cssVar('--line'); c.fillRect(l, ry, pw, rh); c.globalAlpha = 1;
+      c.font = `9.5px ${mono2}`; c.fillStyle = muted; c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillText(T('pluie'), l - 5, ry + rh / 2);
+      const pMx = Math.max(4, ...hours.map(x => x.w ? x.w.pr : 0)); c.textAlign = 'center';
+      for (const x of hours) { if (!x.w || x.w.pr < 0.05) continue;
+        const xa = X(x.a) + .75, bw = Math.max(2, X(x.b) - X(x.a) - 1.5), op = Math.min(1, .3 + x.w.pr / pMx * .7);
+        c.globalAlpha = op; c.fillStyle = rc; c.fillRect(xa, ry, bw, rh); c.globalAlpha = 1;
+        if (x.w.pr >= 0.1) { c.font = `600 9.5px ${mono2}`; const tx = fR(x.w.pr) + ' ' + UL.mmh; if (c.measureText(tx).width + 6 <= bw) { c.fillStyle = op > .6 ? '#fff' : ink; c.fillText(tx, xa + bw / 2, ry + rh / 2 + .5); } } }
+      // vent toutes les 10 min, lissé : composante de face d'après le cap de la trace
+      const vs = [];
+      for (let t = ta; t <= tb + 1; t += 600e3) { const tt = Math.min(t, tb), km = kmAtT(tt), w = S.wx ? wxAt(sIdx(km), tt) : null; if (!w) continue;
+        vs.push({ t: tt, ws: w.ws, g: isFinite(w.gust) ? w.gust : NaN, h: w.ws * Math.cos((w.wd - S.P.b[idxAtKm(km)]) * RAD) }); if (t >= tb) break; }
+      if (vs.length > 1) {
+        const n = vs.length, R = Math.max(2, Math.round(n * .03));
+        const smo = k => vs.map((_, j) => { let s = 0, q = 0; for (let i = Math.max(0, j - R * 2); i <= Math.min(n - 1, j + R * 2); i++) { const v = vs[i][k]; if (!isFinite(v)) continue; const wgt = Math.exp(-(((i - j) / (R / 2 || 1)) ** 2)); s += v * wgt; q += wgt; } return q ? s / q : NaN; });
+        const sws = smo('ws'), sg = smo('g'), sh = smo('h');
+        const cls = j => { if (!(sws[j] > 0)) return 't'; const r = sh[j] / sws[j]; return r > .35 ? 'h' : r < -.35 ? 't' : 'x'; };
+        const col = { h: cssVar('--head'), t: cssVar('--tail'), x: mix(cssVar('--head'), cssVar('--sun'), .55) };
+        const top = Math.max(20, ...sws, ...sg.filter(isFinite)), vK = uV(1), vStep = niceStep(top * vK / 3), vMax = Math.ceil(top * vK / vStep) * vStep / vK;
+        const Yv = v => yT1 - v / vMax * (yT1 - yT0) * .82;
+        c.save(); c.globalAlpha = .5;
+        for (let a = 0; a < n - 1;) { const k = cls(a); let z = a; while (z < n - 2 && cls(z + 1) === k) z++; const e2 = z + 1;
+          c.beginPath(); c.moveTo(X(vs[a].t), yT1); for (let j = a; j <= e2; j++) c.lineTo(X(vs[j].t), Yv(sws[j])); c.lineTo(X(vs[e2].t), yT1); c.closePath(); c.fillStyle = col[k]; c.fill(); a = z + 1; }
+        c.restore();
+        c.beginPath(); vs.forEach((v, j) => j ? c.lineTo(X(v.t), Yv(sws[j])) : c.moveTo(X(v.t), Yv(sws[j]))); c.strokeStyle = ink; c.globalAlpha = .35; c.lineWidth = 1; c.stroke(); c.globalAlpha = 1;
+        if (sg.some(isFinite)) {
+          c.save(); c.lineWidth = 2; c.lineJoin = 'round'; c.lineCap = 'round';
+          for (let a = 0; a < n - 1;) { if (!isFinite(sg[a])) { a++; continue; } const k = cls(a); let z = a; while (z < n - 2 && isFinite(sg[z + 1]) && cls(z + 1) === k) z++; const e2 = isFinite(sg[z + 1]) ? z + 1 : z;
+            c.beginPath(); for (let j = a; j <= e2; j++) { const x = X(vs[j].t), y = Yv(sg[j]); j === a ? c.moveTo(x, y) : c.lineTo(x, y); } c.strokeStyle = col[k]; c.stroke(); a = z + 1; }
+          c.restore();
+          let jm = -1; vs.forEach((v, j) => { if (isFinite(v.g) && (jm < 0 || v.g > vs[jm].g)) jm = j; });
+          if (jm >= 0) { const gx = X(vs[jm].t), gy = Yv(isFinite(sg[jm]) ? sg[jm] : vs[jm].g), gc = col[cls(jm)];
+            c.fillStyle = gc; c.beginPath(); c.arc(gx, gy, 3.2, 0, Math.PI * 2); c.fill();
+            c.font = `600 10px ${mono2}`; c.textBaseline = 'bottom'; const gt = T('rafales ') + fV(vs[jm].g), gw = c.measureText(gt).width;
+            c.textAlign = gx + 8 + gw > l + pw ? 'right' : 'left'; c.fillText(gt, c.textAlign === 'right' ? gx - 6 : gx + 6, gy - 3); }
+        }
+        // échelle du vent à gauche (l'altitude est à droite)
+        c.font = `9.5px ${mono2}`; c.fillStyle = muted; c.textAlign = 'right'; c.textBaseline = 'middle';
+        for (let v = vStep; v <= vMax * vK + 1e-6; v += vStep) c.fillText(n0(v), l - 5, Yv(v / vK));
+        c.textBaseline = 'bottom'; c.fillText(UL.kmh, l - 3, Yv(vMax) - 6);
+      }
+      // en haut : ciel, ressenti et heure, au départ puis toutes les heures, et à l'arrivée
+      const cols = []; for (let t = ta; t < tb - 60e3; t += 3600e3) cols.push(t);
+      if (cols.length > 1 && tb - cols[cols.length - 1] < 1200e3) cols[cols.length - 1] = tb; else cols.push(tb);
+      let lq = -99;
+      cols.forEach((q, i) => { const x = clamp(X(q), l + 8, l + pw - 8); if (x - lq < 30) return;
+        const km = kmAtT(q), w = S.wx ? wxAt(sIdx(km), q) : null; if (!w) return; lq = x;
+        drawSky(c, w, x - 8, 2, 16); c.textAlign = 'center'; c.textBaseline = 'bottom';
+        if (isFinite(w.app)) { c.font = `700 12.5px ${mono2}`; c.fillStyle = tempColor(w.app); c.fillText(fT(w.app) + '°', x, 37); }
+        c.font = `9.5px ${mono2}`; c.fillStyle = muted; c.fillText(hm.format(new Date(q)), x, 50); });
+    }
     if (noWx) { c.fillStyle = muted; c.font = T("12px {0}, system-ui, sans-serif", [cssVar('--f-body').split(',')[0]]); c.textAlign = 'left'; c.textBaseline = 'top';
       c.fillText(S.wx ? T("Pas encore de prévision météo pour {0} (disponible 16 jours avant).", [isLap ? (S.laps && S.laps.taf ? T("ce trajet") : T("ce tour")) : T("ce jour")]) : T("Météo indisponible pour l'instant."), l, 8); }
+    if (v2 && !noWx) dayWxV2();
+    else {
     // température ressentie
     if (!noWx) {
     c.beginPath(); pts.forEach((p, i) => { const x = X(p.t), y = Yt(p.w.app); i ? c.lineTo(x, y) : c.moveTo(x, y); });
@@ -6545,10 +6610,11 @@ function drawDayWx(cv, cur) {
       drawSky(c, x.w, cx - 8, 2, 16);
       const k = 13 / 24; c.save(); c.translate(cx, 29); c.rotate(((x.w.wd + 180) % 360) * RAD); c.scale(k, k); c.translate(-12, -12);
       const ap = new Path2D(WARROW); c.fillStyle = windStrength(x.w.ws)[1]; c.fill(ap); c.lineWidth = 1.4; c.strokeStyle = '#0b1218'; c.lineJoin = 'round'; c.stroke(ap); c.restore(); }
+    }
     // heures en bas
     c.fillStyle = muted; c.font = `10px ${mono}, monospace`; c.textAlign = 'center'; c.textBaseline = 'top';
     const step = pw / Math.max(1, span / 3600e3) < 34 ? 2 : 1; let lastH = -99;
-    for (let h0 = Math.ceil(ta / 3600e3) * 3600e3; h0 <= tb; h0 += 3600e3) { const hr = new Date(h0).getHours(); if (hr % step) continue; const x = X(h0); if (x - lastH < 26) continue; lastH = x; c.fillText(hrTxt(hr), x, yT1 + 4); }
+    for (let h0 = Math.ceil(ta / 3600e3) * 3600e3; h0 <= tb; h0 += 3600e3) { const hr = new Date(h0).getHours(); if (hr % step) continue; const x = X(h0); if (x - lastH < 26) continue; lastH = x; c.fillText(hrTxt(hr), x, yB + 4); }
     // découpage en km : repère au passage de chaque km rond (pas de 5 à 50 km selon la place)
     const kK = uD(1), kmSpan = (d.b.km - d.a.km) * kK, kStep = [1, 2, 5, 10, 20, 25, 50].find(s => pw / (kmSpan / s) >= 44) || 50; // dans l'unité affichée
     const tAtKm = km => S.tl.times[idxAtKm(km)];
@@ -6556,8 +6622,8 @@ function drawDayWx(cv, cur) {
     const kOff = isLap && S.laps && S.laps.taf ? d.a.km : 0; // Vélotaf : km depuis le début du trajet
     for (let kd = Math.ceil((d.a.km - kOff) * kK / kStep) * kStep; kd <= (d.b.km - kOff) * kK + 1e-6; kd += kStep) { const km = kd / kK + kOff;
       const x = X(clamp(tAtKm(km), ta, tb)), txt = n0(kd), w2 = c.measureText(txt).width / 2;
-      if (x - w2 < lastR + 8 || x - w2 < l - 2) continue; lastR = x + w2; c.fillText(txt, x, yT1 + 20); }
-    c.textAlign = 'right'; c.fillStyle = muted; c.fillText(UL.km, l - 8, yT1 + 20);
+      if (x - w2 < lastR + 8 || x - w2 < l - 2) continue; lastR = x + w2; c.fillText(txt, x, yB + 20); }
+    c.textAlign = 'right'; c.fillStyle = muted; c.fillText(UL.km, l - 8, yB + 20);
     // lever et coucher du soleil pendant la journée, calculés là où l'on se trouve à ce moment-là
     const posAt = t => S.P.pts[idxAtKm(kmAtT(clamp(t, ta, tb)))];
     const sunNear = []; let sunIn = false;
@@ -6586,7 +6652,7 @@ function drawDayWx(cv, cur) {
     if (PLACES.list.length && !isLap) {
       const inDay = attachToRoute(PLACES.list).filter(p => p.km >= d.a.km - 0.5 && p.km <= d.b.km + 0.5 && (p.place !== 'village' || p.off <= 1200))
         .sort((a, b) => (PLACE_RANK[b.place] || 0) - (PLACE_RANK[a.place] || 0) || b.pop - a.pop);
-      const placed = [], yP = yT1 + 36;
+      const placed = [], yP = yB + 36;
       for (const p of inDay) {
         const x = X(clamp(tAtKm(p.km), ta, tb)), big = p.place === 'city', vil = p.place === 'village';
         c.font = T("{0} {1}px {2}, system-ui, sans-serif", [big ? 700 : vil ? 400 : 600, big ? 12 : vil ? 10 : 11, cssVar('--f-body').split(',')[0]]);
@@ -6604,7 +6670,7 @@ function drawDayWx(cv, cur) {
     // curseur : trait vertical et étiquette (heure, km, altitude, température, pluie, vent)
     if (cur != null) {
       const x = X(cur), km = kmAtT(cur), i = idxAtKm(km), w = S.wx ? wxAt(sIdx(km), cur) : null;
-      c.strokeStyle = ink; c.lineWidth = 1; c.beginPath(); c.moveTo(x + .5, 0); c.lineTo(x + .5, yT1 + 14); c.stroke();
+      c.strokeStyle = ink; c.lineWidth = 1; c.beginPath(); c.moveTo(x + .5, 0); c.lineTo(x + .5, v2 ? yT1 : yT1 + 14); c.stroke();
       c.fillStyle = cssVar('--accent'); c.beginPath(); c.arc(x, Ye(S.P.es[i]), 4, 0, Math.PI * 2); c.fill();
       const lines = [`${hm.format(new Date(cur))} · ${UL.km} ${fD(km - (isLap && S.laps && S.laps.taf ? d.a.km : 0))} · ${fE(S.P.es[i])} ${UL.m}`];
       if (w) lines.push(`${skyLabel(w.code, w.day)} · ${fT(w.app)}° ${T('ressentis')}${w.pr >= 0.1 ? ` · ${fR(w.pr)} ${UL.mmh}` : ''}`, T("Vent {0} {1} km/h · {2}", [compass(w.wd), fV(w.ws), relLabel(w.ws * Math.cos((w.wd - S.P.b[i]) * RAD)).txt]));
