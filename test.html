@@ -5223,12 +5223,11 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
     const cols = [];
     for (let t = tl.start; t < tl.end - 60e3; t += 1800e3) cols.push(t);
     if (cols.length && tl.end - cols[cols.length - 1] < 1200e3 && cols.length > 1) cols[cols.length - 1] = tl.end; else cols.push(tl.end);
-    let qi = 0, lastQ = -99;
+    let qi = 0, lastQ = -99; const QGAP = S.mode === 'ultra' ? 42 : 30;
     cols.forEach((q, n) => {
       while (qi < P.n - 1 && tl.times[qi + 1] <= q) qi++;
       const x = Math.min(Math.max(X(P.d[qi]), pad.l + 4), pad.l + pw - 4);
-      if (x - lastQ < 30 && n !== cols.length - 1) return;
-      if (x - lastQ < 30) return;
+      if (x - lastQ < QGAP) return; // Ultra : plus d'écart, les heures se touchaient
       const w = wxKm(P.d[qi], q); if (!w) return;
       drawSky(c, w, x - SKY / 2, ySky, SKY);
       c.textAlign = 'center'; c.textBaseline = 'bottom';
