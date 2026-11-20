@@ -4297,26 +4297,31 @@ function renderWindArrows() {
 }
 // flèches de vent sur la carte m, pour les points rg = [i0, i1] (km affichés depuis kOff) ; renvoie le calque
 const TAF_BADGE_KM = 10, TAF_BADGE_MIN = 3, TAF_BADGE_MAX = 6; // Vélotaf : une pastille tous les ~10 km (départ et arrivée compris), de 3 à 6
-// Page Sortie (20/11/2026, maquette « flèches sur la trace ») : une flèche tous les ~ARROW_RIDE px, grosseur et couleur selon la force du vent ;
+// Page Sortie (20/11/2026, maquette « flèches sur la trace ») : une flèche tous les 5 km (règle en km, pas en pixels), grosseur et couleur selon la force du vent ;
 // une pastille (ciel, température, vent) sous une flèche sur deux, sans chevauchement.
-const ARROW_RIDE = 34, arrowRideSz = ws => clamp(19 + ws * 0.5, 19, 34);
+const ARROW_RIDE_KM = 5, PILL_RIDE_EVERY = 3, arrowRideSz = ws => clamp(19 + ws * 0.5, 19, 34); // une flèche tous les 5 km, une pastille toutes les 3 flèches (15 km) : règle en km, indépendante du zoom
+function rideMarks(rg) { // [{ i: indice du point, pill }] pour les points rg = [i0, i1]
+  const P = S.P, d0 = P.d[rg[0]], out = []; let i = rg[0];
+  for (let k = 0; ; k++) {
+    const dk = d0 + ARROW_RIDE_KM * (k + 0.5);
+    if (dk > P.d[rg[1]]) break;
+    while (i < rg[1] && P.d[i] < dk) i++;
+    out.push({ i, pill: k % PILL_RIDE_EVERY === 0 });
+  }
+  return out;
+}
 function drawArrowsRide(map, rg, kOff, layer, showS) {
-  const P = S.P, view = map.getBounds().pad(0.2), pills = [], box = [88, 26];
-  let run = ARROW_RIDE / 2, prev = null, n = 0;
-  for (let i = rg[0]; i <= rg[1]; i++) {
-    const p = P.pts[i], px = map.latLngToLayerPoint([p.lat, p.lon]);
-    if (prev) run += px.distanceTo(prev);
-    prev = px;
-    if (run < ARROW_RIDE || !view.contains([p.lat, p.lon])) continue;
+  const P = S.P, view = map.getBounds().pad(0.2);
+  for (const mk of rideMarks(rg)) {
+    const i = mk.i, p = P.pts[i];
+    if (!view.contains([p.lat, p.lon])) continue;
     const t = S.tl.times[i], w = wxAt(sIdx(P.d[i]), t);
     if (!w) continue;
-    run = 0;
     const head = w.ws * Math.cos((w.wd - P.b[i]) * RAD), [, col, lbl] = windStrength(w.ws), sz = Math.round(arrowRideSz(w.ws));
     const tip = T("<b>km {0}</b> · passage {1}<br>{2}{3} · {4} °C{5}<br>Vent de {6} : {7} km/h ({8}){9}<br>Pour vous : {10}", [fD(P.d[i] - (kOff || 0)), hm.format(new Date(t)), skyLabel(w.code, w.day), isFinite(w.cc) ? T(' (nuages {0} %)', [n0(w.cc)]) : '', fT(w.temp), w.pr >= 0.1 ? T(" · pluie {0} mm/h", [fR(w.pr)]) : '', compass(w.wd), fV(w.ws), lbl.toLowerCase(), isFinite(w.gust) ? T("<br>Rafales {0} km/h", [fV(w.gust)]) : '', relLabel(head).txt]);
     const html = `<div class="wa2"><svg viewBox="0 0 24 24" width="${sz}" height="${sz}" style="transform:rotate(${(w.wd + 180) % 360}deg)"><path d="${WARROW}" fill="${col}" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" paint-order="stroke"/></svg></div>`;
     L.marker([p.lat, p.lon], { icon: L.divIcon({ html, className: '', iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2] }), keyboard: false }).bindTooltip(tip).addTo(layer);
-    if (n++ % 2 || pills.some(q => badgeHit([px.x, px.y], q, box))) continue;
-    pills.push([px.x, px.y]);
+    if (!mk.pill) continue;
     const sky = showS ? skySvg(w, 15) : '';
     const ph = `<div class="wa"><b>${sky}<span class="wt">${fT(w.temp)}°</span><span class="ww">${fV(w.ws)}<small>${UL.kmh}</small></span></b></div>`;
     L.marker([p.lat, p.lon], { icon: L.divIcon({ html: ph, className: '', iconSize: [110, 20], iconAnchor: [55, -(sz / 2 + 2)] }), keyboard: false }).bindTooltip(tip).addTo(layer);
@@ -4590,12 +4595,14 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
   const rgx = o.rg || tripRange();
   if (S.wx && rgx && (exA || exS)) {
     const arrow = new Path2D(WARROW), shown = [], box = badgeBox(exA, exS), rideStyle = exA && S.mode === 'ride';
-    let run = (rideStyle ? ARROW_RIDE : ARROW_GAP) / 2, prev = null, nA = 0;
+    let run = ARROW_GAP / 2, prev = null;
+    const rideMap = rideStyle ? new Map(rideMarks(rgx).map(mk => [mk.i, mk])) : null;
     for (let i = rgx[0]; i <= rgx[1]; i++) {
       const [x, y] = pt(P.pts[i].lat, P.pts[i].lon);
+      if (rideStyle && !rideMap.has(i)) continue;
       if (prev) run += Math.hypot(x - prev[0], y - prev[1]);
       prev = [x, y];
-      if (run < (rideStyle ? ARROW_RIDE : ARROW_GAP) || x < x0 - 20 || y < y0 - 20 || x > x0 + W + 20 || y > y0 + H + 20) continue;
+      if ((!rideStyle && run < ARROW_GAP) || x < x0 - 20 || y < y0 - 20 || x > x0 + W + 20 || y > y0 + H + 20) continue;
       if (!rideStyle && shown.some(q => badgeHit([x, y], q, box))) continue;
       const w = wxAt(sIdx(P.d[i]), S.tl.times[i]); if (!w) continue;
       run = 0;
@@ -4606,8 +4613,7 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
         c.translate(x, y); c.rotate(((w.wd + 180) % 360) * RAD); c.scale(k, k); c.translate(-12, -12);
         c.lineWidth = 1.8 / k * 1; c.lineJoin = 'round'; c.strokeStyle = '#fff'; c.stroke(arrow); c.shadowColor = 'transparent';
         c.fillStyle = windStrength(w.ws)[1]; c.fill(arrow); c.restore();
-        showPill = !(nA++ % 2) && !shown.some(q => badgeHit([x, y], q, [88, 26]));
-        if (showPill) shown.push([x, y]); else continue;
+        if (!rideMap.get(i).pill) continue;
       } else { shown.push([x, y]); }
       if (exA && !rideStyle) {
         c.save(); c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 3; c.shadowOffsetY = 1;
