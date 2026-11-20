@@ -31,6 +31,12 @@ jobs:
           for f in israel-and-palestine.ndjson.gz sea.ndjson.gz south-africa-and-lesotho.ndjson.gz ile-de-clipperton.ndjson.gz; do   # zones exclues (Antoine) et doublons / packs vides
             gh release delete-asset poi-packs "$f" -R "$REPO" -y 2>/dev/null && echo "retiré : $f" || true
           done
+          # Régions des États-Unis publiées sous « us-us-* » le 19/11/2026 (double préfixe) : elles remplacent les anciens « us-* »
+          gh api "repos/$REPO/releases/tags/poi-packs" --jq '.assets[] | select(.name | startswith("us-us-")) | "\(.id) \(.name)"' | while read id name; do
+            new="${name#us-}"
+            gh release delete-asset poi-packs "$new" -R "$REPO" -y 2>/dev/null || true
+            gh api -X PATCH "repos/$REPO/releases/assets/$id" -f name="$new" --jq '"renommé : " + .name'
+          done
           gh release download poi-packs -R "$REPO" -p 'index.json' -O old-index.json 2>/dev/null || echo '{"packs":[]}' > old-index.json
           gh release download poi-packs -R "$REPO" -p '*.ndjson.gz'
           ls | wc -l
