@@ -765,6 +765,7 @@ window.PMR_I18N = {
     "Vent de dos ou faible (< 4 km/h)": "Tailwind or light (< 4 km/h)",
     "Vent de travers": "Crosswind",
     "Rafales (pointillé, même couleur que le vent)": "Gusts (dashed, same colour as the wind)",
+    "Rafales (trait fin, même couleur que le vent)": "Gusts (thin line, same colour as the wind)",
     "Profil altimétrique avec ressenti, pluie, vent et rafales": "Elevation profile with feels-like, rain, wind and gusts",
     "Travers ou faible": "Crosswind or light",
     "Trier les parcours": "Sort routes",
