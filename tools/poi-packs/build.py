@@ -21,7 +21,7 @@ import sys
 KEEP = ("name", "opening_hours", "drinking_water", "website", "phone", "contact:phone", "contact:website",
         "addr:street", "addr:housenumber", "addr:postcode", "addr:city", "backcountry", "camp_site",
         "shelter_type", "bicycle", "fee", "access", "seasonal", "capacity", "cuisine", "brand",
-        "amenity", "shop", "tourism", "man_made",
+        "amenity", "shop", "tourism", "man_made", "emergency",
         "place", "population", "name:fr", "name:en", "int_name")
 
 
@@ -49,6 +49,12 @@ def classify(t):
         return "recharge"
     if a == "toilets" and t.get("access") not in ("private", "no", "customers"):
         return "wc"
+    if a == "shower":
+        return "douche"
+    if t.get("emergency") == "defibrillator" and t.get("access") not in ("private", "no"):
+        return "defibrillateur"
+    if a == "atm":
+        return "atm"
     # Types en plus pour la page Ultra (osm_web_put2)
     if a == "fuel":
         return "carburant"
