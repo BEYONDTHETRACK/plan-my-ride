@@ -4255,7 +4255,8 @@ function sampleRangeOf(r) {
   return [k0, k1];
 }
 // Page Sortie, onglet « Vent ressenti » : trace en filet clair à contour sombre (les flèches portent le vent) ; les autres onglets gardent la trace colorée
-const ridePlain = () => S.mode === 'ride' && !['temp', 'rain', 'sun'].includes(S.metric);
+const rideLike = () => S.mode === 'ride' || S.mode === 'ultra'; // flèches à hampe : Sortie, Ultra (et Commute pour les flèches seulement)
+const ridePlain = () => rideLike() && !['temp', 'rain', 'sun'].includes(S.metric);
 function renderMap() {
   if (!map) return;
   if (routeLayer) routeLayer.remove();
@@ -4313,7 +4314,7 @@ function rideMarks(rg, pxKm) { // [{ i: indice du point, pill }] pour les points
   return out;
 }
 const pxPerKm = (f) => Math.abs(f(1 / 111.32)); // f(deltaLat) = écart vertical en pixels pour ce décalage de latitude
-function drawArrowsRide(map, rg, kOff, layer, showS) {
+function drawArrowsRide(map, rg, kOff, layer, showS, taf) {
   const P = S.P, view = map.getBounds().pad(0.2), c0 = map.getCenter();
   const pxKm = pxPerKm(dl => map.latLngToContainerPoint([c0.lat + dl, c0.lng]).y - map.latLngToContainerPoint([c0.lat, c0.lng]).y);
   for (const mk of rideMarks(rg, pxKm)) {
@@ -4330,10 +4331,21 @@ function drawArrowsRide(map, rg, kOff, layer, showS) {
     const dl = (-((mk.i % 7) * 0.37) % dur).toFixed(2), calm = w.ws < 5 ? ' calm' : '';
     const html = `<div class="wa2" style="position:relative;width:${2 * R}px;height:${2 * R}px"><div style="position:absolute;left:${R - sz / 2}px;top:${R - tipY}px;width:${sz}px;height:${sz}px;transform-origin:50% ${tipY}px;transform:rotate(${th}deg)"><svg class="wmove${calm}" viewBox="0 0 24 24" width="${sz}" height="${sz}" style="--d:${dur}s;--a:${amp}px;--dl:${dl}s"><path d="${RIDE_ARROW}" fill="#fff" stroke="#fff" stroke-width="3.6" stroke-linejoin="round"/><path d="${RIDE_ARROW}" fill="${col}" stroke="#0a1410" stroke-width="1.3" stroke-linejoin="round"/></svg></div></div>`;
     L.marker([p.lat, p.lon], { icon: L.divIcon({ html, className: '', iconSize: [2 * R, 2 * R], iconAnchor: [R, R] }), keyboard: false, interactive: true }).bindTooltip(tip).addTo(layer);
-    if (!mk.pill) continue;
+    if (taf || !mk.pill) continue;
     const sky = showS ? skySvg(w, 15) : '';
     const ph = `<div class="wa"><b>${sky}<span class="wt">${fT(w.temp)}°</span><span class="ww">${fV(w.ws)}<small>${UL.kmh}</small></span></b></div>`;
     L.marker([p.lat, p.lon], { icon: L.divIcon({ html: ph, className: '', iconSize: [110, 20], iconAnchor: [55 - dx * 46, 10 - dy * 24] }), keyboard: false }).bindTooltip(tip).addTo(layer); // pastille du côté où va le vent, à l'opposé du corps de la flèche
+  }
+  if (taf) { // Commute : pastilles régulièrement réparties (3 à 6), comme avant, à côté de la flèche la plus proche
+    const d0 = P.d[rg[0]], len = P.d[rg[1]] - d0, n = clamp(Math.ceil(len / TAF_BADGE_KM) + 1, TAF_BADGE_MIN, TAF_BADGE_MAX); let i = rg[0];
+    for (let k = 0; k < n; k++) {
+      const dk = d0 + len * k / (n - 1); while (i < rg[1] && P.d[i] < dk) i++;
+      const p = P.pts[i], t = S.tl.times[i], w = wxAt(sIdx(P.d[i]), t); if (!w || !view.contains([p.lat, p.lon])) continue;
+      const th = (w.wd + 180) % 360, dx = Math.sin(th * RAD), dy = -Math.cos(th * RAD), [, , lbl] = windStrength(w.ws);
+      const tip = T("<b>km {0}</b> · passage {1}<br>{2}{3} · {4} °C{5}<br>Vent de {6} : {7} km/h ({8}){9}", [fD(P.d[i] - (kOff || 0)), hm.format(new Date(t)), skyLabel(w.code, w.day), isFinite(w.cc) ? T(' (nuages {0} %)', [n0(w.cc)]) : '', fT(w.temp), w.pr >= 0.1 ? T(" · pluie {0} mm/h", [fR(w.pr)]) : '', compass(w.wd), fV(w.ws), lbl.toLowerCase(), isFinite(w.gust) ? T("<br>Rafales {0} km/h", [fV(w.gust)]) : '']);
+      const ph = `<div class="wa"><b>${skySvg(w, 15)}<span class="wt">${fT(w.temp)}°</span><span class="ww">${fV(w.ws)}<small>${UL.kmh}</small></span></b></div>`;
+      L.marker([p.lat, p.lon], { icon: L.divIcon({ html: ph, className: '', iconSize: [110, 20], iconAnchor: [55 - dx * 46, 10 - dy * 24] }), keyboard: false }).bindTooltip(tip).addTo(layer);
+    }
   }
   return layer;
 }
@@ -4342,7 +4354,8 @@ function drawArrowsOn(m, rg, kOff, noArrows) {
   const showA = !noArrows && $('#arrowsOn').checked, showS = noArrows || $('#skyOn').checked;
   if (!S.wx || !S.tl || !rg || (!showA && !showS)) return layer; // plusieurs tours : pas de vent sur la carte
   { const sz = map.getSize(); if (!sz.x || !sz.y) return layer; } // carte masquée (Commute : la grande carte est cachée) : getBounds donnait NaN et arrêtait tout le calcul (bug du 20/11/2026)
-  if (showA && S.mode === 'ride') return drawArrowsRide(m, rg, kOff, layer, showS);
+  if (showA && rideLike()) return drawArrowsRide(m, rg, kOff, layer, showS);
+  if (noArrows && S.laps && S.laps.taf) return drawArrowsRide(m, rg, kOff, layer, true, true); // Commute : flèches à hampe + pastilles réparties selon la distance du trajet
   // Une flèche tous les ~40 px le long de la trace, quel que soit le zoom, et seulement dans la zone visible.
   // Entre deux points météo, la flèche prend le point le plus proche à l'heure de passage à cet endroit.
   const P = S.P, view = map.getBounds().pad(0.2), shown = [], box = badgeBox(showA, showS);
@@ -4603,7 +4616,7 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
   const exA = o.arrows ?? $('#arrowsOn').checked, exS = o.sky ?? $('#skyOn').checked;
   const rgx = o.rg || tripRange();
   if (S.wx && rgx && (exA || exS)) {
-    const arrow = new Path2D(WARROW), rarrow = new Path2D(RIDE_ARROW), shown = [], box = badgeBox(exA, exS), rideStyle = exA && S.mode === 'ride';
+    const arrow = new Path2D(WARROW), rarrow = new Path2D(RIDE_ARROW), shown = [], box = badgeBox(exA, exS), rideStyle = exA && rideLike();
     let run = ARROW_GAP / 2, prev = null;
     const [ex0, ey0] = pt(P.pts[rgx[0]].lat, P.pts[rgx[0]].lon), [ex1, ey1] = pt(P.pts[rgx[0]].lat + 1 / 111.32, P.pts[rgx[0]].lon);
     const rideMap = rideStyle ? new Map(rideMarks(rgx, Math.hypot(ex1 - ex0, ey1 - ey0)).map(mk => [mk.i, mk])) : null;
