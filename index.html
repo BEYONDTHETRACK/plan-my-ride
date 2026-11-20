@@ -4025,6 +4025,7 @@ function drawArrowsOn(m, rg, kOff, noArrows) {
   const layer = L.layerGroup().addTo(m), map = m, windLayer = layer;
   const showA = !noArrows && $('#arrowsOn').checked, showS = noArrows || $('#skyOn').checked;
   if (!S.wx || !S.tl || !rg || (!showA && !showS)) return layer; // plusieurs tours : pas de vent sur la carte
+  { const sz = map.getSize(); if (!sz.x || !sz.y) return layer; } // carte masquée (Commute : la grande carte est cachée) : getBounds donnait NaN et arrêtait tout le calcul (bug du 20/11/2026)
   // Une flèche tous les ~40 px le long de la trace, quel que soit le zoom, et seulement dans la zone visible.
   // Entre deux points météo, la flèche prend le point le plus proche à l'heure de passage à cet endroit.
   const P = S.P, view = map.getBounds().pad(0.2), shown = [], box = badgeBox(showA, showS);
