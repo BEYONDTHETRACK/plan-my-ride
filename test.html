@@ -5084,6 +5084,10 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
     const w = S.wx ? wxKm(km, t) : null;
     bins.push({ km, i, t, w, ele: P.es[i], head: w ? w.ws * Math.cos((w.wd - P.b[i]) * RAD) : 0 });
   }
+  // vent, rafales et part de face lissés (moyenne pondérée sur environ 2 % de la trace de chaque côté) : courbes moins anguleuses
+  { const R = Math.max(3, Math.round(nb * .02)), sm = (get, set) => { const v = bins.map(get);
+      bins.forEach((b, k) => { let s = 0, n = 0; for (let j = Math.max(0, k - R); j <= Math.min(nb, k + R); j++) if (isFinite(v[j])) { const g = Math.exp(-(((j - k) / (R / 2)) ** 2)); s += v[j] * g; n += g; } set(b, n ? s / n : NaN); }); };
+    sm(b => b.w ? b.w.ws : NaN, (b, v) => b.sws = v); sm(b => b.w ? b.w.gust : NaN, (b, v) => b.sg = v); sm(b => b.w ? b.head : NaN, (b, v) => b.sh = v); }
   // nuit
   c.fillStyle = cssVar('--night');
   const moonSegs = [];
@@ -5116,7 +5120,7 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
       const vK = uV(1), vStep = niceStep(Math.max(20, top) * vK / 4), vMax = Math.ceil(Math.max(20, top) * vK / vStep) * vStep / vK;
       const Yv = v => pad.t + ph - v / vMax * ph * .82;
       // couleur selon le sens, même par vent faible : dos vert, face rouille, travers orange
-      const cls = b => { const w = b.w; if (!w) return 'n'; if (!(w.ws > 0)) return 't'; const r = b.head / w.ws; return r > .35 ? 'h' : r < -.35 ? 't' : 'x'; };
+      const cls = b => { const w = b.w; if (!w) return 'n'; if (!(b.sws > 0)) return 't'; const r = b.sh / b.sws; return r > .35 ? 'h' : r < -.35 ? 't' : 'x'; };
       const col = { h: cssVar('--head'), t: cssVar('--tail'), x: mix(cssVar('--head'), cssVar('--sun'), .55) };
       c.save(); c.globalAlpha = .5;
       for (let a = 0; a < nb;) {
@@ -5124,32 +5128,31 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
         const k = cls(bins[a]); let z = a; while (z < nb && bins[z + 1].w && cls(bins[z + 1]) === k) z++;
         const e = Math.min(nb, z + 1);
         c.beginPath(); c.moveTo(X(bins[a].km), pad.t + ph);
-        for (let j = a; j <= e; j++) if (bins[j].w) c.lineTo(X(bins[j].km), Yv(bins[j].w.ws));
+        for (let j = a; j <= e; j++) if (bins[j].w) c.lineTo(X(bins[j].km), Yv(bins[j].sws));
         c.lineTo(X(bins[e].km), pad.t + ph); c.closePath(); c.fillStyle = col[k]; c.fill();
         a = z + 1;
       }
       c.restore();
       c.beginPath(); let st = false;
-      bins.forEach(b => { if (!b.w) { st = false; return; } const x = X(b.km), y = Yv(b.w.ws); st ? c.lineTo(x, y) : c.moveTo(x, y); st = true; });
+      bins.forEach(b => { if (!b.w) { st = false; return; } const x = X(b.km), y = Yv(b.sws); st ? c.lineTo(x, y) : c.moveTo(x, y); st = true; });
       c.strokeStyle = ink; c.globalAlpha = .35; c.lineWidth = 1; c.stroke(); c.globalAlpha = 1;
       // rafales
       const gb = bins.filter(b => b.w && isFinite(b.w.gust));
       if (gb.length) {
         // trait plein coloré comme le vent selon son sens (dos vert, face rouille, travers orange), tronçon par tronçon
         c.save(); c.lineWidth = 2.2; c.lineJoin = 'round'; c.lineCap = 'round';
-        const gOk = b => b && b.w && isFinite(b.w.gust);
-        let dash = 0;
+        const gOk = b => b && b.w && isFinite(b.sg);
         for (let a = 0; a < nb;) {
           if (!gOk(bins[a])) { a++; continue; }
           const k = cls(bins[a]); let z = a; while (z < nb && gOk(bins[z + 1]) && cls(bins[z + 1]) === k) z++;
           const e = Math.min(nb, gOk(bins[z + 1]) ? z + 1 : z);
           c.beginPath();
-          for (let j = a; j <= e; j++) { const x = X(bins[j].km), y = Yv(bins[j].w.gust); j === a ? c.moveTo(x, y) : c.lineTo(x, y); if (j > a) dash += Math.hypot(x - X(bins[j - 1].km), y - Yv(bins[j - 1].w.gust)); }
+          for (let j = a; j <= e; j++) { const x = X(bins[j].km), y = Yv(bins[j].sg); j === a ? c.moveTo(x, y) : c.lineTo(x, y); }
           c.strokeStyle = col[k]; c.stroke();
           a = z + 1;
         }
         c.restore();
-        const gm = gb.reduce((m, b) => b.w.gust > m.w.gust ? b : m, gb[0]), gx = X(gm.km), gy = Yv(gm.w.gust), gc = col[cls(gm)];
+        const gm = gb.reduce((m, b) => b.w.gust > m.w.gust ? b : m, gb[0]), gx = X(gm.km), gy = Yv(isFinite(gm.sg) ? gm.sg : gm.w.gust), gc = col[cls(gm)];
         c.fillStyle = gc; c.beginPath(); c.arc(gx, gy, 3.5, 0, Math.PI * 2); c.fill();
         c.font = `600 10.5px ${mono}, monospace`; c.textBaseline = 'bottom';
         const gt = T('rafales ') + fV(gm.w.gust), gw = c.measureText(gt).width;
