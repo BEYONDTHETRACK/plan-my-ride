@@ -6483,7 +6483,7 @@ function drawDayWx(cv, cur) {
     // jours d'Ultra (20/11/2026, option A d'Antoine) : même dessin que le profil v2 — ressenti et ciel toutes les heures en haut,
     // vent en aire colorée selon son sens posé sur le relief, rafales en trait, pluie en ruban sous le tracé
     const v2 = !isLap, RB = v2 ? 22 : 0;
-    const sc = cv.closest('.plan-scroll'), W = sc ? Math.max(260, Math.max(sc.clientWidth, 700) - 24) : Math.max(260, cv.parentElement.clientWidth), H = v2 ? 262 : 150, dpr = window.devicePixelRatio || 1;
+    const sc = cv.closest('.plan-scroll'), W = sc ? Math.max(260, Math.max(sc.clientWidth, 700) - 24) : Math.max(260, cv.parentElement.clientWidth), H = v2 ? 300 : 150, dpr = window.devicePixelRatio || 1;
     cv.style.width = W + 'px'; cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr;
     const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
     const ink = cssVar('--ink'), muted = cssVar('--muted'), mono = cssVar('--f-mono').split(',')[0];
@@ -6647,7 +6647,7 @@ function drawDayWx(cv, cur) {
       const near = sunNear.map(([te, dir]) => [te, dir, te < ta ? ta - te : te - tb]).filter(e => e[2] <= 4 * 3600e3).sort((a, b) => a[2] - b[2])[0];
       if (near) sunDraw(near[0] < ta ? l + 10 : l + pw - 10, near[0], near[1], near[1] > 0 ? T('lever ') : T('coucher '));
     }
-    drawMoons(c, moonSegs, yT0 + 10, mono); // lune et sa phase dans les parties de nuit
+    drawMoons(c, moonSegs, yT0 + (v2 ? 28 : 10), mono); // lune et sa phase dans les parties de nuit
     // villes et bourgs traversés ce jour-là, à l'heure de passage (les plus grands d'abord, sans chevauchement)
     if (PLACES.list.length && !isLap) {
       const inDay = attachToRoute(PLACES.list).filter(p => p.km >= d.a.km - 0.5 && p.km <= d.b.km + 0.5 && (p.place !== 'village' || p.off <= 1200))
