@@ -13,11 +13,11 @@ fs.mkdirSync(OUT, { recursive: true });
 const C = { night: '#14201b', nightDeep: '#121b17', paper: '#f1f3f0', sun: '#e0a21b', rain: '#5ba3da', rainLight: '#3e86c0', ink: '#14201b' };
 
 // Logo (viewBox 0 0 110 100), centré sur (cx, cy) avec une largeur w.
-// bold = variante « icône » des PNG du site (icons/sillage-512.png) : traits plus épais, deux gouttes
+// bold = variante « icône » des PNG du site (icons/sillage-512.png) : traits plus épais, trois gouttes
 function mark({ cx, cy, w, ink, rain, bold }) {
   const s = w / 110, x = cx - 55 * s, y = cy - 50 * s;
   const g = bold
-    ? { mask: 32, ring: 9.5, sun: 8.7, ray: 4.7, rays: 'M83.20 48.00L86.00 48.00M79.33 57.33L81.31 59.31M70.00 61.20L70.00 64.00M60.67 57.33L58.69 59.31M56.80 48.00L54.00 48.00M60.67 38.67L58.69 36.69M70.00 34.80L70.00 32.00M79.33 38.67L81.31 36.69', drop: 6.4, drops: 'M30.4 83.7L27.5 92.3M46.4 83.7L43.5 92.3' }
+    ? { mask: 32, ring: 9.5, sun: 8.7, ray: 4.7, rays: 'M83.20 48.00L86.00 48.00M79.33 57.33L81.31 59.31M70.00 61.20L70.00 64.00M60.67 57.33L58.69 59.31M56.80 48.00L54.00 48.00M60.67 38.67L58.69 36.69M70.00 34.80L70.00 32.00M79.33 38.67L81.31 36.69', drop: 6.4, drops: 'M30.4 83.7L27.5 92.3M46.4 83.7L43.5 92.3M62.4 83.7L59.5 92.3' }
     : { mask: 31, ring: 8, sun: 8, ray: 3.5, rays: 'M82 48h5M78.5 56.5l3.5 3.5M70 60v5M61.5 56.5L58 60M58 48h-5M61.5 39.5L58 36M70 36v-5M78.5 39.5L82 36', drop: 5, drops: 'M28 82l-3 9M41 82l-3 9M54 82l-3 9' };
   return `<g transform="translate(${x} ${y}) scale(${s})">
     <defs><mask id="m"><rect x="-20" y="-20" width="150" height="140" fill="#fff"/><circle cx="70" cy="48" r="${g.mask}" fill="#000"/></mask></defs>
