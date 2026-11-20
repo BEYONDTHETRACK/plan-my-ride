@@ -2342,8 +2342,8 @@ body[data-mode="ride"] .chart-keys .ck-v1,body:not([data-mode="ride"]) .chart-ke
         <span class="ck-v2"><i style="background:var(--ink)"></i>Altitude</span>
         <span class="ck-v2"><i style="background:var(--rain)"></i>Pluie (mm/h)</span>
         <span class="ck-v2"><i style="background:var(--head)"></i>Vent de face (km/h, échelle de droite)</span>
-        <span class="ck-v2"><i style="background:var(--tail)"></i>Vent de dos</span>
-        <span class="ck-v2"><i style="background:var(--sun)"></i>Vent de travers (rien sous 4 km/h)</span>
+        <span class="ck-v2"><i style="background:var(--tail)"></i>Vent de dos ou faible (&lt; 4 km/h)</span>
+        <span class="ck-v2"><i style="background:var(--sun)"></i>Vent de travers</span>
         <span class="ck-v2"><i style="background:repeating-linear-gradient(90deg,var(--brand) 0 5px,transparent 5px 8px)"></i>Rafales</span>
         <span class="ck-v1"><i style="background:var(--elev-line)"></i>Altitude</span>
         <span class="ck-v1"><i style="background:var(--warm)"></i>Température ressentie</span>
@@ -5112,8 +5112,8 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
       const top = Math.max(...wb.map(b => Math.max(b.w.ws, isFinite(b.w.gust) ? b.w.gust : 0)));
       const vK = uV(1), vStep = niceStep(Math.max(20, top) * vK / 4), vMax = Math.ceil(Math.max(20, top) * vK / vStep) * vStep / vK;
       const Yv = v => pad.t + ph - v / vMax * ph * .82;
-      // moins de 4 km/h : pas d'aire (vent négligeable) ; travers en doré, comme dans la tuile du vent
-      const cls = b => { const w = b.w; if (!w || w.ws < 4) return 'n'; const r = b.head / w.ws; return r > .35 ? 'h' : r < -.35 ? 't' : 'x'; };
+      // moins de 4 km/h : en vert comme le vent de dos (sans gêne) ; travers en doré, comme dans la tuile du vent
+      const cls = b => { const w = b.w; if (!w) return 'n'; if (w.ws < 4) return 't'; const r = b.head / w.ws; return r > .35 ? 'h' : r < -.35 ? 't' : 'x'; };
       const col = { h: cssVar('--head'), t: cssVar('--tail'), x: cssVar('--sun') };
       c.save(); c.globalAlpha = .5;
       for (let a = 0; a < nb;) {
@@ -5127,7 +5127,7 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
       }
       c.restore();
       c.beginPath(); let st = false;
-      bins.forEach(b => { if (!b.w || b.w.ws < 4) { st = false; return; } const x = X(b.km), y = Yv(b.w.ws); st ? c.lineTo(x, y) : c.moveTo(x, y); st = true; });
+      bins.forEach(b => { if (!b.w) { st = false; return; } const x = X(b.km), y = Yv(b.w.ws); st ? c.lineTo(x, y) : c.moveTo(x, y); st = true; });
       c.strokeStyle = ink; c.globalAlpha = .35; c.lineWidth = 1; c.stroke(); c.globalAlpha = 1;
       // rafales
       const gb = bins.filter(b => b.w && isFinite(b.w.gust));

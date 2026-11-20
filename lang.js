@@ -762,6 +762,8 @@ window.PMR_I18N = {
     "Vent de face (km/h, échelle de droite)": "Headwind (km/h, right scale)",
     "Vent de travers ou < 4 km/h": "Crosswind or < 4 km/h",
     "Vent de travers (rien sous 4 km/h)": "Crosswind (nothing under 4 km/h)",
+    "Vent de dos ou faible (< 4 km/h)": "Tailwind or light (< 4 km/h)",
+    "Vent de travers": "Crosswind",
     "Profil altimétrique avec ressenti, pluie, vent et rafales": "Elevation profile with feels-like, rain, wind and gusts",
     "Travers ou faible": "Crosswind or light",
     "Trier les parcours": "Sort routes",
