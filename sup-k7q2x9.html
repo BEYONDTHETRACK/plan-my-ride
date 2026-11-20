@@ -1223,6 +1223,38 @@ function pDupHtml(p) {
   h += '<div><button type="button" class="b" style="background:var(--brand);border-color:var(--brand);color:#14201b" data-merge="' + p.id + '"' + (ch ? '' : ' disabled') + '>' + (c ? 'Fusionner et valider' : ch === 'none' ? 'Pas un doublon, valider' : 'Choisis d\'abord une option') + '</button></div></div>';
   return h;
 }
+// Deux avis du même cycliste sur le même lieu à moins de 7 jours d'écart : proposer de les fusionner (20/11/2026).
+const REV_MERGE_MS = 7 * 86400000;
+function pRevTwin(r) {
+  if (r.status === 'removed') return null;
+  const t = +new Date(r.created_at);
+  return P.revs.filter(o => o.id !== r.id && o.status !== 'removed' && o.user_id === r.user_id && o.poi_key === r.poi_key && +new Date(o.created_at) < t && t - +new Date(o.created_at) <= REV_MERGE_MS)
+    .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))[0] || null;
+}
+function pRevMerged(a, b) { // a = le plus ancien, b = le plus récent
+  const comment = [a.comment, b.comment].filter(Boolean).join('\n\n').slice(0, 1000) || null;
+  return { rating: b.rating || a.rating || null, comment, photo: a.photo || b.photo || null, reports: (a.reports || 0) + (b.reports || 0), status: a.status === 'pending' || b.status === 'pending' ? 'pending' : 'valid', lostPhoto: !!(a.photo && b.photo) };
+}
+function pRevMergeHtml(r) {
+  const a = pRevTwin(r); if (!a) return '';
+  const m = pRevMerged(a, r), days = Math.max(1, Math.round((+new Date(r.created_at) - +new Date(a.created_at)) / 86400000));
+  return '<div class="pdup"><div class="warn"><span style="font-size:18px" aria-hidden="true">⚠</span><div><b>Deux avis de la même personne sur ce lieu</b><span>Postés à ' + days + ' j d\'intervalle (' + pAgo(a.created_at) + ' et ' + pAgo(r.created_at) + '). Les fusionner en un seul avis ?</span></div></div>'
+    + '<div class="pmerge"><div class="h">Avis fusionné · ce qui est gardé</div>'
+    + '<div class="prow"><span class="k">Note</span><span class="v">' + (m.rating ? '★★★★★'.slice(0, m.rating) + '☆☆☆☆☆'.slice(0, 5 - m.rating) + ' (la plus récente)' : 'aucune') + '</span></div>'
+    + '<div class="prow"><span class="k">Texte</span><span class="v">' + (m.comment ? esc(m.comment) : 'aucun') + '</span></div>'
+    + '<div class="prow"><span class="k">Photo</span><span class="v">' + (m.photo ? (m.lostPhoto ? 'celle du premier avis (l\'autre est écartée)' : 'gardée') : 'aucune') + '</span></div></div>'
+    + '<div><button type="button" class="b" style="background:var(--brand);border-color:var(--brand);color:#14201b" data-revmerge="' + r.id + '">Fusionner les deux avis</button></div></div>';
+}
+async function pRevMerge(id) {
+  const r = P.revs.find(y => y.id === id), a = r && pRevTwin(r); if (!a) return;
+  const m = pRevMerged(a, r), now = new Date().toISOString();
+  const { error } = await sb.from('poi_review').update({ rating: m.rating, comment: m.comment, photo: m.photo, reports: m.reports, status: m.status, reviewed_at: m.status === 'pending' ? null : now }).eq('id', a.id);
+  if (error) return alertMsg(error.message);
+  const d = await sb.from('poi_review').delete().eq('id', r.id);
+  if (d.error) return alertMsg(d.error.message);
+  Object.assign(a, { rating: m.rating, comment: m.comment, photo: m.photo, reports: m.reports, status: m.status });
+  P.revs = P.revs.filter(y => y.id !== r.id); pBadge(); pRender();
+}
 function pRender() {
   if (!P.loaded) { $('pList').innerHTML = '<li class="muted">Chargement…</li>'; return; }
   if (P.err) { $('pList').innerHTML = '<li class="msg err">Lecture impossible : ' + esc(P.err) + (/relation|does not exist|schema cache/i.test(P.err) ? ' — le script supabase/sql/2026-10-31_poi.sql n\'est pas encore appliqué.' : '') + '</li>'; return; }
@@ -1249,7 +1281,7 @@ function pRender() {
       + '<b style="font-size:15px">sur « ' + esc(nm(r)) + ' »</b>' + (/^p:/.test(r.poi_key) ? '' : '<span class="ty">point OSM</span>') + (r.reports > 0 ? '<span class="prep">⚑ Signalé ' + r.reports + ' fois</span>' : '') + '</div>'
       + (r.comment ? '<span class="txt">' + esc(r.comment) + '</span>' : '') + '<span class="meta">Par ' + 'un·e cycliste' + ' · ' + pAgo(r.created_at) + '</span></div>'
       + (r.photo ? '<a href="' + esc(PHOTO + r.photo) + '" target="_blank" rel="noopener"><img class="ph" src="' + esc(PHOTO + r.photo) + '" alt="Photo jointe" loading="lazy"></a>' : '')
-      + pStatus(r.status) + '<div class="acts">' + pActs('r', r) + '</div></li>').join('');
+      + pStatus(r.status) + '<div class="acts">' + pActs('r', r) + '</div>' + pRevMergeHtml(r) + '</li>').join('');
   }
   $('pList').innerHTML = html || '<li class="card pad empty" style="text-align:center">Rien ici. Tout est à jour.</li>';
 }
@@ -1272,6 +1304,7 @@ $('pList').addEventListener('click', async e => {
     if (b.dataset.undo === 'p' && x && x.osm_ref) { const { error } = await sb.rpc('poi_unmerge', { p_id: id }); if (error) return alertMsg(error.message); x.osm_ref = null; x.status = 'pending'; P.dup[id] = { state: 'wait', list: [] }; P.q.push(x); pBadge(); pRender(); return pDupPump(); }
     return pSet(b.dataset.undo, id, 'pending');
   }
+  if (b.dataset.revmerge) { b.disabled = true; return pRevMerge(b.dataset.revmerge); }
   if (b.dataset.redup) { const p = P.pois.find(y => y.id === b.dataset.redup); P.dup[p.id] = { state: 'wait', list: [] }; P.q.push(p); return pDupPump(); }
   if (b.dataset.pick) { P.choice[b.dataset.pick] = b.dataset.ref; return pRender(); }
   if (b.dataset.flip) { P.pick[b.dataset.flip] = (P.pick[b.dataset.flip] || 'S') === 'S' ? 'O' : 'S'; return pRender(); }
