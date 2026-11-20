@@ -5242,6 +5242,16 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
       if (X(P.total) - x > 26) c.fillText(S.laps.names ? S.laps.names[k] : 'T' + (k + 1), x + 3, pad.t + ph - 14); });
     c.restore();
   }
+  // pauses prévues : zone dorée au km de la pause, avec son nom et sa durée
+  if (tl) for (const st of tl.stops) if (st.pstop) {
+    const x = X(st.km), bw = 10, txt = T("Pause {0} min", [Math.round((st.to - st.from) / 60e3)]);
+    c.save(); c.fillStyle = cssVar('--brand'); c.globalAlpha = .28; c.fillRect(x - bw / 2, pad.t, bw, ph);
+    c.globalAlpha = .9; c.setLineDash([3, 3]); c.strokeStyle = cssVar('--brand'); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x - bw / 2 + .5, pad.t); c.lineTo(x - bw / 2 + .5, pad.t + ph); c.moveTo(x + bw / 2 - .5, pad.t); c.lineTo(x + bw / 2 - .5, pad.t + ph); c.stroke(); c.setLineDash([]);
+    c.font = `700 11px ${mono}, monospace`; const tw = c.measureText(txt).width + 12, tx = Math.min(Math.max(x - tw / 2, pad.l), pad.l + pw - tw), ty = pad.t + 6;
+    c.globalAlpha = 1; c.fillStyle = cssVar('--brand'); c.beginPath(); c.roundRect ? c.roundRect(tx, ty, tw, 18, 9) : c.rect(tx, ty, tw, 18); c.fill();
+    c.fillStyle = cssVar('--brand-ink'); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, tx + tw / 2, ty + 9.5); c.restore();
+  }
   // axe km
   c.font = font(10.5); c.fillStyle = muted; c.textAlign = 'center'; c.textBaseline = 'top';
   const kK = uD(1), kStep = niceStep(P.total * kK / Math.max(3, Math.floor(pw / 80))); // repères en km ou en miles

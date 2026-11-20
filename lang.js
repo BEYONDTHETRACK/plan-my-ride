@@ -763,6 +763,7 @@ window.PMR_I18N = {
     "Retirer la pause": "Remove break",
     "Pause": "Break",
     "Pause km {0} · {1} min": "Break km {0} · {1} min",
+    "Pause {0} min": "Break {0} min",
     "Tous tes parcours, avec recherche, tri, « Renommer » et « Supprimer ». Touche un parcours pour l'ouvrir.": "All your routes, with search, sorting, “Rename” and “Delete”. Tap a route to open it.",
     "Trace": "Track",
     "Trace colorée selon le vent ressenti (rouge = de face, vert = de dos) · pastilles : ciel et température à ton heure de passage · traînées : vent animé au milieu du trajet.": "Track coloured by felt wind (red = headwind, green = tailwind) · dots: sky and temperature when you pass · streaks: animated wind at mid-trip.",
