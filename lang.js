@@ -538,6 +538,7 @@ window.PMR_I18N = {
     "Nouveau nom du parcours": "New route name",
     "Nuages : strate grise en haut": "Clouds: grey band at the top",
     "Nuages : strate grise en haut (plus foncée = plus couvert)": "Clouds: grey band at the top (darker = more overcast)",
+    "Nuages : bande grise en haut (plus foncée = plus couvert)": "Clouds: grey band at the top (darker = more overcast)",
     "Nuit": "Night",
     "Open-Meteo (automatique)": "Open-Meteo (automatic)",
     "Open-Meteo limite les demandes par minute : reprise automatique dans une minute…": "Open-Meteo limits requests per minute: resuming automatically in a minute…",
