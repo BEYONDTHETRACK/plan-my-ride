@@ -1782,6 +1782,7 @@ html.demo-web body.guest #libPage .lp-tools{display:flex}html.demo-web #libPage 
 html.demo-web #tabOut,html.demo-web #tabMe,html.demo-web .rail-admin,html.demo-web #pmAdd,html.demo-web #outAll,html.demo-web .lp-imp,html.demo-web label.imp-btn,html.demo-web #loginLink,html.demo-web #logoutLink,html.demo-web #meDel,html.demo-web #alBox,html.demo-web #exportImg,html.demo-web #exportImg2,html.demo-web .adm{display:none!important}
 .sgl{position:absolute!important;inset:0;z-index:0;pointer-events:none;overflow:hidden}.sgl .maplibregl-canvas{outline:none}
 .leaflet-control-layers-base label{white-space:nowrap}
+body[data-mode="ride"] .chart-keys .ck-v1,body:not([data-mode="ride"]) .chart-keys .ck-v2{display:none}
 </style>
 </head>
 <body>
@@ -2338,12 +2339,18 @@ html.demo-web #tabOut,html.demo-web #tabMe,html.demo-web .rail-admin,html.demo-w
         <div class="tip" id="tip" hidden></div>
       </div>
       <div class="chart-keys">
-        <span><i style="background:var(--ink)"></i>Altitude</span>
-        <span><i style="background:var(--rain)"></i>Pluie (mm/h)</span>
-        <span><i style="background:var(--head)"></i>Vent de face (km/h, échelle de droite)</span>
-        <span><i style="background:var(--tail)"></i>Vent de dos</span>
-        <span><i style="background:var(--cross)"></i>Vent de travers ou &lt; 4 km/h</span>
-        <span><i style="background:repeating-linear-gradient(90deg,var(--brand) 0 5px,transparent 5px 8px)"></i>Rafales</span>
+        <span class="ck-v2"><i style="background:var(--ink)"></i>Altitude</span>
+        <span class="ck-v2"><i style="background:var(--rain)"></i>Pluie (mm/h)</span>
+        <span class="ck-v2"><i style="background:var(--head)"></i>Vent de face (km/h, échelle de droite)</span>
+        <span class="ck-v2"><i style="background:var(--tail)"></i>Vent de dos</span>
+        <span class="ck-v2"><i style="background:var(--cross)"></i>Vent de travers ou &lt; 4 km/h</span>
+        <span class="ck-v2"><i style="background:repeating-linear-gradient(90deg,var(--brand) 0 5px,transparent 5px 8px)"></i>Rafales</span>
+        <span class="ck-v1"><i style="background:var(--elev-line)"></i>Altitude</span>
+        <span class="ck-v1"><i style="background:var(--warm)"></i>Température ressentie</span>
+        <span class="ck-v1"><i style="background:var(--rain)"></i>Pluie (mm/h)</span>
+        <span class="ck-v1"><i style="background:var(--head)"></i>Vent de face (barre vers le haut, km/h)</span>
+        <span class="ck-v1"><i style="background:var(--tail)"></i>Vent de dos (barre vers le bas)</span>
+        <span class="ck-v1"><i style="background:var(--cross)"></i>Travers ou &lt; 4 km/h</span>
         <span id="ccKey"><i style="background:linear-gradient(90deg,rgba(96,108,121,.1),rgba(96,108,121,.75))"></i>Nuages : strate grise en haut (plus foncée = plus couvert)</span>
         <span><i style="background:var(--night);border:1px solid var(--line)"></i>Nuit</span>
       </div>
@@ -5043,7 +5050,8 @@ function idxAtKm(km) { const d = S.P.d; let lo = 0, hi = S.P.n - 1; while (lo < 
 
 /* graphique */
 let chartGeom = null;
-function renderChart() {
+function renderChart() { return S.mode === 'ride' ? renderChartV2() : renderChartV1(); }
+function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti toutes les 30 min, vent posé sur le profil
   const cv = $('#chart'), wrap = $('#chartWrap');
   const W = Math.max(280, wrap.clientWidth - 12), H = W < 600 ? 300 : 340, dpr = window.devicePixelRatio || 1;
   cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr;
@@ -5213,6 +5221,171 @@ function renderChart() {
   const ck = $('#ccKey'); if (ck) ck.hidden = !hasCc;
   drawMoons(c, moonSegs, pad.t + 14, mono); // lune et sa phase dans les parties de nuit
   chartGeom = { wy0, X, pad, pw, ph, bins, nb, Ye, W, H };
+}
+function renderChartV1() { // ancien profil (Ultra, Commute) : température en courbe, panneau du vent en barres
+  const cv = $('#chart'), wrap = $('#chartWrap');
+  const W = Math.max(280, wrap.clientWidth - 12), H = W < 600 ? 338 : 378, dpr = window.devicePixelRatio || 1;
+  cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr;
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  const P = S.P, tl = S.tl;
+  const pad = { l: 44, r: 40, t: 64, b: 30 }, band = 0, SKY = 16, ARW = 15, WP = WP_CHART, GS = 12, WG = 18; // en haut : heures, ciel, puis sens du vent
+  // couverture nuageuse dessinée en nuages en haut du graphique (seulement si la source la donne)
+  const hasCc = !!S.wx && S.wx.some(L => L && L.cc && L.cc.some(v => isFinite(v))), cband = 0, cgap = 0;
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b - WP - WG - cband - cgap;
+  const wy0 = pad.t + ph + WG, wyz = wy0 + GS + (WP - GS) / 2; // panneau vent sous le profil : haut (bande des rafales au-dessus des barres), ligne zéro
+  const X = km => pad.l + km / P.total * pw;
+  const ink = cssVar('--ink'), muted = cssVar('--muted'), line = cssVar('--line');
+  const font = n => `${n}px ${cssVar('--f-mono').split(',')[0]}, monospace`;
+  // bins
+  const nb = Math.min(Math.floor(pw / 2), 600), bins = [];
+  for (let b = 0; b <= nb; b++) {
+    const km = P.total * b / nb, i = idxAtKm(km), t = tl.times[i];
+    const w = S.wx ? wxAt(sIdx(km), t) : null;
+    bins.push({ km, i, t, w, ele: P.es[i], head: w ? w.ws * Math.cos((w.wd - P.b[i]) * RAD) : 0 });
+  }
+  // nuit
+  c.fillStyle = cssVar('--night');
+  const moonSegs = [];
+  for (let b = 0; b < nb; b++) if (bins[b].w && !bins[b].w.day) {
+    c.fillRect(X(bins[b].km), pad.t, X(bins[b + 1].km) - X(bins[b].km) + .5, ph);
+    const g = moonSegs[moonSegs.length - 1];
+    if (g && g.b === b - 1) { g.x1 = X(bins[b + 1].km); g.b = b; } else moonSegs.push({ x0: X(bins[b].km), x1: X(bins[b + 1].km), t: bins[b].t, b });
+  }
+  // altitude
+  const eMin = P.hasEle ? Math.floor((P.emin - 20) / 50) * 50 : 0, eMax = P.hasEle ? Math.ceil((P.emax + 20) / 50) * 50 : 100;
+  const Ye = e => pad.t + ph - (e - eMin) / (eMax - eMin || 1) * ph;
+  c.beginPath(); c.moveTo(X(0), pad.t + ph);
+  bins.forEach(b => c.lineTo(X(b.km), Ye(b.ele)));
+  c.lineTo(X(P.total), pad.t + ph); c.closePath(); c.fillStyle = cssVar('--elev'); c.fill();
+  c.beginPath(); bins.forEach((b, k) => k ? c.lineTo(X(b.km), Ye(b.ele)) : c.moveTo(X(b.km), Ye(b.ele)));
+  c.strokeStyle = cssVar('--elev-line'); c.lineWidth = 1.2; c.stroke();
+  // mode tours : trait pointillé et numéro au début de chaque tour
+  if (S.laps) {
+    c.save(); c.setLineDash([4, 4]); c.strokeStyle = muted; c.lineWidth = 1; c.font = `600 10px ${cssVar('--f-mono').split(',')[0]}, monospace`; c.fillStyle = muted; c.textAlign = 'left'; c.textBaseline = 'top';
+    S.laps.start.forEach((i, k) => { const x = Math.round(X(P.d[i])) + .5; if (k) { c.beginPath(); c.moveTo(x, pad.t); c.lineTo(x, pad.t + ph); c.stroke(); }
+      if (X(P.total) - x > 26) c.fillText(S.laps.names ? S.laps.names[k] : 'T' + (k + 1), x + 3, pad.t + ph - 14); });
+    c.restore();
+  }
+  // axes altitude
+  c.font = font(10.5); c.fillStyle = muted; c.textAlign = 'right'; c.textBaseline = 'middle';
+  const eK = uE(1), eStep = niceStep((eMax - eMin) * eK / 4); // repères dans l'unité affichée (m ou ft)
+  c.strokeStyle = line; c.lineWidth = 1;
+  for (let ed = Math.ceil(eMin * eK / eStep) * eStep; ed <= eMax * eK; ed += eStep) { const y = Ye(ed / eK); c.beginPath(); c.moveTo(pad.l, y); c.lineTo(pad.l + pw, y); c.globalAlpha = .6; c.stroke(); c.globalAlpha = 1; c.fillText(Math.round(ed) + ' ' + UL.m, pad.l - 5, y); }
+  // pluie
+  if (S.wx) {
+    // pluie : une barre par heure de roulage (pas des prévisions : 1 h), du km atteint au début de l'heure à celui de la fin,
+    // hauteur selon les mm/h ; valeur écrite au-dessus quand la barre est assez large
+    const kmAtT = t => { const TT = tl.times; let lo = 0, hi = P.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (TT[m] < t) lo = m + 1; else hi = m; } return P.d[lo]; };
+    const rbars = [];
+    for (let h0 = Math.floor(tl.start / 3600e3) * 3600e3; h0 < tl.end; h0 += 3600e3) {
+      const ta = Math.max(tl.start, h0), tb = Math.min(tl.end, h0 + 3600e3), ka = kmAtT(ta), kb = kmAtT(tb);
+      if (kb - ka <= 0) continue;
+      const w = wxAt(sIdx((ka + kb) / 2), (ta + tb) / 2);
+      if (w && w.pr >= 0.05) rbars.push({ x: X(ka), x2: X(kb), pr: w.pr });
+    }
+    if (rbars.length) {
+      const pMax = Math.max(2, ...rbars.map(r => r.pr)), rc = cssVar('--rain');
+      c.font = font(9.5); c.textAlign = 'center'; c.textBaseline = 'bottom';
+      for (const r of rbars) {
+        const bw = Math.max(2, r.x2 - r.x - 1.5), hh = Math.max(2, r.pr / pMax * ph * .45), bx = r.x + 0.75, by = pad.t + ph - hh;
+        c.globalAlpha = .8; c.fillStyle = rc; c.fillRect(bx, by, bw, hh); c.globalAlpha = 1;
+        if (bw >= 20 && r.pr >= 0.1) { c.fillStyle = rc; c.fillText(n1(r.pr), bx + bw / 2, by - 2); }
+      }
+    }
+    // nuages : plafond de nuages accroché en haut du graphique, d'autant plus épais et gris que le ciel est couvert
+    if (hasCc) drawCloudCeiling(c, bins, X, pad.l, pad.t, pw, ph);
+    // température (axe droite)
+    const ts = bins.filter(b => b.w).map(b => b.w.app);
+    if (ts.length) {
+      let tMin = Math.floor(Math.min(...ts) - 2), tMax = Math.ceil(Math.max(...ts) + 2);
+      if (tMax - tMin < 8) { const mid = (tMax + tMin) / 2; tMin = Math.floor(mid - 4); tMax = Math.ceil(mid + 4); }
+      const Yt = t => pad.t + ph - (t - tMin) / (tMax - tMin) * ph;
+      c.beginPath(); let started = false;
+      bins.forEach(b => { if (!b.w) { started = false; return; } const x = X(b.km), y = Yt(b.w.app); if (!started) { c.moveTo(x, y); started = true; } else c.lineTo(x, y); });
+      c.strokeStyle = cssVar('--warm'); c.lineWidth = 2; c.stroke();
+      c.textAlign = 'left'; c.fillStyle = cssVar('--warm');
+      const tStep = niceStep((uT(tMax) - uT(tMin)) / 4), tBack = v => UNITS.f ? (v - 32) / 1.8 : v; // repères en °C ou °F
+      for (let td = Math.ceil(uT(tMin) / tStep) * tStep; td <= uT(tMax); td += tStep) c.fillText(Math.round(td) + '°', pad.l + pw + 5, Yt(tBack(td)));
+    }
+    // bande vent
+    // vent ressenti par heure de roulage : barre vers le haut = de face, vers le bas = de dos (moyenne sur l'heure)
+    const wbars = [];
+    for (let h0 = Math.floor(tl.start / 3600e3) * 3600e3; h0 < tl.end; h0 += 3600e3) {
+      const ta = Math.max(tl.start, h0), tb = Math.min(tl.end, h0 + 3600e3), ka = kmAtT(ta), kb = kmAtT(tb);
+      if (kb - ka <= 0) continue;
+      let s = 0, n = 0, g = NaN;
+      for (let j = 0; j < 6; j++) { const t = ta + (tb - ta) * (j + .5) / 6, km = kmAtT(t), w = wxAt(sIdx(km), t);
+        if (w) { s += w.ws * Math.cos((w.wd - P.b[idxAtKm(km)]) * RAD); n++; if (isFinite(w.gust)) g = isFinite(g) ? Math.max(g, w.gust) : w.gust; } }
+      if (n) wbars.push({ x: X(ka), x2: X(kb), v: s / n, g });
+    }
+    c.strokeStyle = line; c.lineWidth = 1; c.beginPath(); c.moveTo(pad.l, wyz); c.lineTo(pad.l + pw, wyz); c.stroke();
+    c.font = font(9.5); c.fillStyle = muted; c.textAlign = 'right'; c.textBaseline = 'middle';
+    c.fillText(T("face ↑"), pad.l - 4, wy0 + GS + 6); c.fillText('0', pad.l - 4, wyz); c.fillText(T("dos ↓"), pad.l - 4, wy0 + WP - 6);
+    c.textAlign = 'left'; c.textBaseline = 'bottom'; c.fillText(pw < 560 ? T("Vent ressenti par heure (km/h) · ▾ rafales") : T("Vent ressenti par heure (km/h) : ↑ de face · ↓ de dos · gris = travers ou faible · ▾ rafales"), pad.l, wy0 - 1);
+    if (wbars.length) {
+      const vMax = Math.max(20, ...wbars.map(b => Math.abs(b.v))), sc = ((WP - GS) / 2 - 11) / vMax;
+      c.textAlign = 'center'; c.font = font(9);
+      for (const b of wbars) {
+        const bw = Math.max(2, b.x2 - b.x - 1.5), bx = b.x + .75, hh = Math.max(1.5, Math.abs(b.v) * sc);
+        const col = Math.abs(b.v) < 4 ? cssVar('--cross') : b.v > 0 ? cssVar('--head') : cssVar('--tail');
+        c.fillStyle = col; c.fillRect(bx, b.v > 0 ? wyz - hh : wyz, bw, hh);
+        if (bw >= 16 && Math.abs(b.v) >= 6) { c.textBaseline = b.v > 0 ? 'bottom' : 'top'; c.fillText(fV(Math.abs(b.v)), bx + bw / 2, b.v > 0 ? wyz - hh - 1 : wyz + hh + 1); }
+      }
+      // rafales de chaque heure : bande en haut du panneau, grises, orange à partir de GUST_SHOW, rouges à partir de GUST_WARN
+      c.font = font(8.5); c.textBaseline = 'middle'; c.textAlign = 'left';
+      let lastG = -99;
+      for (const b of wbars) {
+        if (!isFinite(b.g)) continue;
+        const bw = Math.max(2, b.x2 - b.x - 1.5), cx = b.x + .75 + bw / 2, col = b.g >= GUST_WARN ? cssVar('--head') : b.g >= GUST_SHOW ? cssVar('--warm') : muted, y = wy0 + GS / 2;
+        const txt = (bw >= 44 ? T('rafales ') : '') + fV(b.g), tw = c.measureText(txt).width, x0 = cx - (tw + 9) / 2;
+        if (bw < 14 || x0 < lastG + 4) { c.fillStyle = col; c.beginPath(); c.moveTo(cx - 3, y - 2); c.lineTo(cx + 3, y - 2); c.lineTo(cx, y + 2.5); c.closePath(); c.fill(); continue; }
+        c.fillStyle = col; c.beginPath(); c.moveTo(x0, y - 2); c.lineTo(x0 + 6, y - 2); c.lineTo(x0 + 3, y + 2.5); c.closePath(); c.fill();
+        c.fillText(txt, x0 + 9, y); lastG = x0 + tw + 9;
+      }
+    }
+
+  }
+  // axe km
+  c.fillStyle = muted; c.textAlign = 'center'; c.textBaseline = 'top';
+  const kK = uD(1), kStep = niceStep(P.total * kK / Math.max(3, Math.floor(pw / 80))); // repères en km ou en miles
+  for (let k = 0; k <= P.total * kK + 1e-6; k += kStep) { const x = X(k / kK); c.fillText(n0(k) + (k === 0 ? ' ' + UL.km : ''), x, wy0 + WP + 6); }
+  // heures en haut
+  const span = (tl.end - tl.start) / 3600e3;
+  const hStep = [1, 2, 3, 4, 6, 12, 24].find(s => span / s <= pw / 46) || 24;
+  c.textBaseline = 'bottom'; c.fillStyle = ink;
+  let h0 = new Date(tl.start); h0.setMinutes(0, 0, 0); let tick = h0.getTime() + 3600e3;
+  let pi = 0, lastX = -99;
+  while (tick < tl.end) {
+    const hr = new Date(tick).getHours();
+    if (hr % hStep === 0) {
+      while (pi < P.n - 1 && tl.times[pi + 1] <= tick) pi++;
+      const x = X(P.d[pi]);
+      if (x - lastX > 34) {
+        c.strokeStyle = muted; c.beginPath(); c.moveTo(x, pad.t - 4); c.lineTo(x, pad.t); c.stroke();
+        c.fillText(hr === 0 && hStep >= 6 ? dayFmt.format(new Date(tick)).split(' ')[0] : hrTxt(hr), x, pad.t - ARW - SKY - 9); lastX = x;
+      }
+    }
+    tick += 3600e3;
+  }
+  // ciel et sens du vent tous les quarts d'heure (au moins 19 px entre deux pictogrammes : sinon on en saute)
+  if (S.wx) {
+    let q = Math.ceil(tl.start / 900e3) * 900e3, qi = 0, lastQ = -99;
+    for (; q <= tl.end; q += 900e3) {
+      while (qi < P.n - 1 && tl.times[qi + 1] <= q) qi++;
+      const x = X(P.d[qi]);
+      if (x - lastQ < 19) continue;
+      const w = wxAt(sIdx(P.d[qi]), q); if (!w) continue;
+      drawSky(c, w, x - SKY / 2, pad.t - ARW - SKY - 5, SKY); lastQ = x;
+      // flèche du vent dessous : sens où va le vent, couleur selon la force
+      const k = ARW / 24, ay = pad.t - ARW / 2 - 3;
+      c.save(); c.translate(x, ay); c.rotate(((w.wd + 180) % 360) * RAD); c.scale(k, k); c.translate(-12, -12);
+      const ap = new Path2D(WARROW); c.fillStyle = windStrength(w.ws)[1]; c.fill(ap);
+      c.lineWidth = 1.3; c.strokeStyle = '#0b1218'; c.lineJoin = 'round'; c.stroke(ap); c.restore();
+    }
+  }
+  const ck = $('#ccKey'); if (ck) ck.hidden = !hasCc;
+  drawMoons(c, moonSegs, pad.t + 14, cssVar('--f-mono').split(',')[0]); // lune et sa phase dans les parties de nuit
+  chartGeom = { wy0, X, pad, pw, ph: ph + WG + WP, bins, nb, Ye, W, H };
 }
 function niceStep(raw) { const p = 10 ** Math.floor(Math.log10(raw || 1)), f = raw / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }
 
