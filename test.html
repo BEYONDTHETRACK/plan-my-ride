@@ -9030,7 +9030,7 @@ async function pmFromBase(k) {
    une fois (store pois, clé pk1|fichier, refait quand sa version change), puis parcouru pour la zone demandée (élargie
    de 0,3°) et rangé par carrés de 0,1° en mémoire. Ordre : base Sillage, packs, Overpass. Compte gratuit : un seul pays
    hors ligne, choisi dans le panneau d'avertissement d'Ultra (pkWarn), pas de téléchargement automatique. */
-const PK_ON = IS_TEST;
+const PK_ON = true; // aussi dans l'app (page index.html)
 const PK_URL = SB_URL + '/functions/v1/poi-pack?f=';
 const PK = { idx: null, at: 0, q: 4, cell: new Map(), noCells: true, blobs: new Map(), tiles: new Map(), done: new Set(), scans: new Map(), stored: null };
 function pkPrep(idx) {
