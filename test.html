@@ -4295,7 +4295,7 @@ function renderWindArrows() {
 const TAF_BADGE_KM = 10, TAF_BADGE_MIN = 3, TAF_BADGE_MAX = 6; // Vélotaf : une pastille tous les ~10 km (départ et arrivée compris), de 3 à 6
 // Page Sortie (20/11/2026, maquette « flèches sur la trace ») : une flèche tous les ~ARROW_RIDE px, grosseur et couleur selon la force du vent ;
 // une pastille (ciel, température, vent) sous une flèche sur deux, sans chevauchement.
-const ARROW_RIDE = 34, arrowRideSz = ws => clamp(12 + ws * 0.45, 12, 28);
+const ARROW_RIDE = 34, arrowRideSz = ws => clamp(19 + ws * 0.5, 19, 34);
 function drawArrowsRide(map, rg, kOff, layer, showS) {
   const P = S.P, view = map.getBounds().pad(0.2), pills = [], box = [88, 26];
   let run = ARROW_RIDE / 2, prev = null, n = 0;
