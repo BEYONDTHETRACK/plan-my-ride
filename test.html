@@ -1225,7 +1225,11 @@ body.pm-placing .pm-loc{bottom:16px}
 .pm-ctl .pm-loc{position:static;width:44px;height:44px;bottom:auto}
 .pm-ctl .leaflet-control-layers{margin:0;float:none;position:relative;width:44px;height:44px;border-radius:999px;border:1px solid var(--line)!important;background:var(--panel);box-shadow:0 1px 2px rgba(20,32,27,.08),0 4px 16px rgba(20,32,27,.1)}
 .pm-ctl .leaflet-control-layers-toggle{width:42px;height:42px;background-size:22px;border-radius:999px}
-.pm-ctl .leaflet-control-layers-expanded{position:absolute;top:0;right:0;width:auto;height:auto;border-radius:14px;z-index:20;color:var(--ink);padding:8px 10px;background:var(--panel)}
+.pm-ctl .leaflet-control-layers-expanded{z-index:20;color:var(--ink);padding:0}
+/* ouvert : seule la liste se déploie (par-dessus le bouton, qui reste à sa place) ; avant, tout le contrôle passait en
+   absolu en haut de la colonne, le doigt ne le touchait plus, « mouseleave » refermait aussitôt et le fond de carte
+   ne pouvait pas se changer sur téléphone (bug du 20/11/2026) */
+.pm-ctl .leaflet-control-layers-expanded .leaflet-control-layers-list{position:absolute;top:-1px;right:-1px;width:max-content;border-radius:14px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);box-shadow:0 1px 2px rgba(20,32,27,.08),0 4px 16px rgba(20,32,27,.1)}
 .pm-search{position:absolute;z-index:5;display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;border-radius:999px;background:var(--panel);border:1px solid var(--line);box-shadow:0 1px 2px rgba(20,32,27,.08),0 4px 16px rgba(20,32,27,.1)}
 .pm-search>svg{width:20px;height:20px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;flex:none}
 .pm-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:16px var(--f-body)}
