@@ -4299,20 +4299,24 @@ function renderWindArrows() {
 const TAF_BADGE_KM = 10, TAF_BADGE_MIN = 3, TAF_BADGE_MAX = 6; // Vélotaf : une pastille tous les ~10 km (départ et arrivée compris), de 3 à 6
 // Page Sortie (20/11/2026, maquette « flèches sur la trace ») : une flèche tous les 5 km (règle en km, pas en pixels), grosseur et couleur selon la force du vent ;
 // une pastille (ciel, température, vent) sous une flèche sur deux, sans chevauchement.
-const ARROW_RIDE_KM = 3.85, PILL_RIDE_EVERY = 4, arrowRideSz = ws => clamp(19 + ws * 0.5, 19, 34); // une flèche tous les 3,85 km (+30 %), une pastille toutes les 4 flèches (~15 km) : règle en km, indépendante du zoom
-function rideMarks(rg) { // [{ i: indice du point, pill }] pour les points rg = [i0, i1]
-  const P = S.P, d0 = P.d[rg[0]], out = []; let i = rg[0];
+const ARROW_RIDE_PX = 60, PILL_RIDE_EVERY = 4, arrowRideSz = ws => clamp(19 + ws * 0.5, 19, 34), RIDE_ARROW = 'M12 1.5 L17.6 9.2 L14.24 9.2 L14.24 22.5 L9.76 22.5 L9.76 9.2 L6.4 9.2 Z'; // flèche à hampe (forme S1, 20/11/2026) ; une flèche tous les ~60 px de carte, une pastille toutes les 4 flèches
+// pas en km selon le zoom : puissance de 2 (0,25 à 64 km) la plus proche de ARROW_RIDE_PX pixels ; pxKm = pixels pour 1 km sur la carte
+function rideStep(pxKm) { if (!(pxKm > 0)) return 4; return Math.pow(2, clamp(Math.round(Math.log2(ARROW_RIDE_PX / pxKm)), -2, 6)); }
+function rideMarks(rg, pxKm) { // [{ i: indice du point, pill }] pour les points rg = [i0, i1]
+  const P = S.P, d0 = P.d[rg[0]], step = rideStep(pxKm), out = []; let i = rg[0];
   for (let k = 0; ; k++) {
-    const dk = d0 + ARROW_RIDE_KM * (k + 0.5);
-    if (dk > P.d[rg[1]]) break;
+    const dk = d0 + step * (k + 1);
+    if (dk > P.d[rg[1]] - step * 0.25) break;
     while (i < rg[1] && P.d[i] < dk) i++;
     out.push({ i, pill: k % PILL_RIDE_EVERY === 0 });
   }
   return out;
 }
+const pxPerKm = (f) => Math.abs(f(1 / 111.32)); // f(deltaLat) = écart vertical en pixels pour ce décalage de latitude
 function drawArrowsRide(map, rg, kOff, layer, showS) {
-  const P = S.P, view = map.getBounds().pad(0.2);
-  for (const mk of rideMarks(rg)) {
+  const P = S.P, view = map.getBounds().pad(0.2), c0 = map.getCenter();
+  const pxKm = pxPerKm(dl => map.latLngToContainerPoint([c0.lat + dl, c0.lng]).y - map.latLngToContainerPoint([c0.lat, c0.lng]).y);
+  for (const mk of rideMarks(rg, pxKm)) {
     const i = mk.i, p = P.pts[i];
     if (!view.contains([p.lat, p.lon])) continue;
     const t = S.tl.times[i], w = wxAt(sIdx(P.d[i]), t);
@@ -4324,7 +4328,7 @@ function drawArrowsRide(map, rg, kOff, layer, showS) {
     // animation : la flèche avance dans le sens du vent, plus vite et plus loin quand il souffle fort (comme avant)
     const dur = clamp(2.8 - w.ws * 0.05, 0.55, 2.8).toFixed(2), amp = clamp(1.5 + w.ws * 0.12, 1.5, 5).toFixed(1);
     const dl = (-((mk.i % 7) * 0.37) % dur).toFixed(2), calm = w.ws < 5 ? ' calm' : '';
-    const html = `<div class="wa2" style="position:relative;width:${2 * R}px;height:${2 * R}px"><div style="position:absolute;left:${R - sz / 2}px;top:${R - tipY}px;width:${sz}px;height:${sz}px;transform-origin:50% ${tipY}px;transform:rotate(${th}deg)"><svg class="wmove${calm}" viewBox="0 0 24 24" width="${sz}" height="${sz}" style="--d:${dur}s;--a:${amp}px;--dl:${dl}s"><path d="${WARROW}" fill="${col}" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" paint-order="stroke"/></svg></div></div>`;
+    const html = `<div class="wa2" style="position:relative;width:${2 * R}px;height:${2 * R}px"><div style="position:absolute;left:${R - sz / 2}px;top:${R - tipY}px;width:${sz}px;height:${sz}px;transform-origin:50% ${tipY}px;transform:rotate(${th}deg)"><svg class="wmove${calm}" viewBox="0 0 24 24" width="${sz}" height="${sz}" style="--d:${dur}s;--a:${amp}px;--dl:${dl}s"><path d="${RIDE_ARROW}" fill="#fff" stroke="#fff" stroke-width="3.6" stroke-linejoin="round"/><path d="${RIDE_ARROW}" fill="${col}" stroke="#0a1410" stroke-width="1.3" stroke-linejoin="round"/></svg></div></div>`;
     L.marker([p.lat, p.lon], { icon: L.divIcon({ html, className: '', iconSize: [2 * R, 2 * R], iconAnchor: [R, R] }), keyboard: false, interactive: true }).bindTooltip(tip).addTo(layer);
     if (!mk.pill) continue;
     const sky = showS ? skySvg(w, 15) : '';
@@ -4599,9 +4603,10 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
   const exA = o.arrows ?? $('#arrowsOn').checked, exS = o.sky ?? $('#skyOn').checked;
   const rgx = o.rg || tripRange();
   if (S.wx && rgx && (exA || exS)) {
-    const arrow = new Path2D(WARROW), shown = [], box = badgeBox(exA, exS), rideStyle = exA && S.mode === 'ride';
+    const arrow = new Path2D(WARROW), rarrow = new Path2D(RIDE_ARROW), shown = [], box = badgeBox(exA, exS), rideStyle = exA && S.mode === 'ride';
     let run = ARROW_GAP / 2, prev = null;
-    const rideMap = rideStyle ? new Map(rideMarks(rgx).map(mk => [mk.i, mk])) : null;
+    const [ex0, ey0] = pt(P.pts[rgx[0]].lat, P.pts[rgx[0]].lon), [ex1, ey1] = pt(P.pts[rgx[0]].lat + 1 / 111.32, P.pts[rgx[0]].lon);
+    const rideMap = rideStyle ? new Map(rideMarks(rgx, Math.hypot(ex1 - ex0, ey1 - ey0)).map(mk => [mk.i, mk])) : null;
     for (let i = rgx[0]; i <= rgx[1]; i++) {
       const [x, y] = pt(P.pts[i].lat, P.pts[i].lon);
       if (rideStyle && !rideMap.has(i)) continue;
@@ -4616,8 +4621,8 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
         sz = Math.round(arrowRideSz(w.ws)); k = sz / 24;
         c.save(); c.shadowColor = 'rgba(0,0,0,.4)'; c.shadowBlur = 2; c.shadowOffsetY = 1;
         c.translate(x, y); c.rotate(((w.wd + 180) % 360) * RAD); c.scale(k, k); c.translate(-12, -1.5);
-        c.lineWidth = 1.8 / k; c.lineJoin = 'round'; c.strokeStyle = '#fff'; c.stroke(arrow); c.shadowColor = 'transparent';
-        c.fillStyle = windStrength(w.ws)[1]; c.fill(arrow); c.restore();
+        c.lineWidth = 3.6 / k; c.lineJoin = 'round'; c.strokeStyle = '#fff'; c.fillStyle = '#fff'; c.stroke(rarrow); c.fill(rarrow); c.shadowColor = 'transparent';
+        c.fillStyle = windStrength(w.ws)[1]; c.fill(rarrow); c.lineWidth = 1.3 / k; c.strokeStyle = '#0a1410'; c.stroke(rarrow); c.restore();
         pdx = Math.sin(((w.wd + 180) % 360) * RAD); pdy = -Math.cos(((w.wd + 180) % 360) * RAD);
         if (!rideMap.get(i).pill) continue;
       } else { shown.push([x, y]); }
