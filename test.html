@@ -803,8 +803,12 @@ body.lib-open{overflow:hidden}
 .al-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .al-grid .me-sel{box-sizing:border-box}
 .al-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px}
-.al-days button{min-height:42px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--muted);font:inherit;font-weight:600;cursor:pointer}
-.al-days button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.al-days button{min-height:54px;border:2px solid var(--head);border-radius:12px;background:color-mix(in srgb,var(--head) 10%,var(--panel));color:var(--head);font:inherit;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0}
+.al-days button::after{content:"✕";font-size:13px;font-weight:800;line-height:1}
+.al-days button[aria-pressed="true"]{background:var(--tail);border-color:var(--tail);color:var(--bg)}
+.al-days button[aria-pressed="true"]::after{content:"✓"}
+.al-legend{display:flex;gap:14px;margin-top:8px;font-size:13px;color:var(--muted)}
+.al-legend .on{color:var(--tail);font-weight:700}.al-legend .no{color:var(--head);font-weight:700}
 .al-dev{align-items:center}
 .al-state{font-size:14px;color:var(--muted)}
 .al-state.on{color:var(--tail);font-weight:600}
@@ -1993,7 +1997,7 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
         <div><label class="al-l" for="alWhen">Prévenir</label><select id="alWhen" class="me-sel"><option value="eve">La veille, 20 h</option><option value="morn">Le matin, 7 h</option></select></div>
       </div>
       <span class="al-l">Jours de sortie</span>
-      <div class="al-days" id="alDays" role="group" aria-label="Jours de sortie"></div>
+      <div class="al-days" id="alDays" role="group" aria-label="Jours de sortie"></div><div class="al-legend"><span class="on">✓ Alerte activée</span><span class="no">✕ Pas d'alerte</span></div>
       <div class="me-btns"><button type="button" class="btn small" id="alTest">Envoyer l'alerte maintenant</button><button type="button" class="btn small" id="alOff">Couper les alertes</button></div>
       </details>
       <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
@@ -9268,7 +9272,7 @@ function alRender() {
   else if (rem.length && !rem.some(x => x.id === r.route_id)) $('#alRoute').insertAdjacentHTML('afterbegin', `<option value="" selected>${escH(T("Choisis un parcours…"))}</option>`);
   $('#alTime').value = r.dep_time || '09:00'; $('#alWhen').value = r.notify || 'eve';
   const days = new Set(r.days || []);
-  $('#alDays').innerHTML = AL_DAYS.map((l, i) => `<button type="button" data-d="${i + 1}" aria-pressed="${days.has(i + 1)}" title="${AL_DAYN[i]}">${l}</button>`).join('');
+  $('#alDays').innerHTML = AL_DAYS.map((l, i) => `<button type="button" data-d="${i + 1}" aria-pressed="${days.has(i + 1)}" title="${AL_DAYN[i]} : ${days.has(i + 1) ? T("alerte activée") : T("pas d'alerte")}">${l}</button>`).join('');
   $('#alBox').classList.toggle('off', !on);
   $('#alOff').hidden = !on; $('#alTest').hidden = !dev;
   // prochaine alerte (page Moi v2.0) : la veille à 20 h ou le jour même à 7 h d'un jour de sortie coché
@@ -9315,7 +9319,7 @@ $('#alKind').addEventListener('click', e => { const b = e.target.closest('button
 for (const id of ['#alRoute', '#alTime', '#alWhen']) $(id).addEventListener('change', async () => { if (await alSave({})) { alMsg(T("Enregistré.")); alRender(); } });
 $('#alDays').addEventListener('click', async e => {
   const b = e.target.closest('button[data-d]'); if (!b) return;
-  b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+  b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); b.title = AL_DAYN[+b.dataset.d - 1] + ' : ' + (b.getAttribute('aria-pressed') === 'true' ? T("alerte activée") : T("pas d'alerte"));
   if (await alSave({})) { alMsg(AL.row.days.length ? T("Enregistré.") : T("Aucun jour choisi : pas d'alerte.")); }
 });
 $('#alTest').addEventListener('click', async () => {
