@@ -4299,7 +4299,7 @@ function renderWindArrows() {
 const TAF_BADGE_KM = 10, TAF_BADGE_MIN = 3, TAF_BADGE_MAX = 6; // Vélotaf : une pastille tous les ~10 km (départ et arrivée compris), de 3 à 6
 // Page Sortie (20/11/2026, maquette « flèches sur la trace ») : une flèche tous les 5 km (règle en km, pas en pixels), grosseur et couleur selon la force du vent ;
 // une pastille (ciel, température, vent) sous une flèche sur deux, sans chevauchement.
-const ARROW_RIDE_PX = 60, PILL_RIDE_EVERY = 4, arrowRideSz = ws => clamp(19 + ws * 0.5, 19, 34), RIDE_ARROW = 'M12 1.5 L17.6 9.2 L14.24 9.2 L14.24 22.5 L9.76 22.5 L9.76 9.2 L6.4 9.2 Z'; // flèche à hampe (forme S1, 20/11/2026) ; une flèche tous les ~60 px de carte, une pastille toutes les 4 flèches
+const ARROW_RIDE_PX = 80, PILL_RIDE_EVERY = 4, arrowRideSz = ws => clamp(32 + ws * 0.8, 32, 54), RIDE_ARROW = 'M12 1.5 L17.6 9.2 L14.24 9.2 L14.24 22.5 L9.76 22.5 L9.76 9.2 L6.4 9.2 Z'; // flèche à hampe (forme S1, 20/11/2026) ; une flèche tous les ~60 px de carte, une pastille toutes les 4 flèches
 // pas en km selon le zoom : puissance de 2 (0,25 à 64 km) la plus proche de ARROW_RIDE_PX pixels ; pxKm = pixels pour 1 km sur la carte
 function rideStep(pxKm) { if (!(pxKm > 0)) return 4; return Math.pow(2, clamp(Math.round(Math.log2(ARROW_RIDE_PX / pxKm)), -2, 6)); }
 function rideMarks(rg, pxKm) { // [{ i: indice du point, pill }] pour les points rg = [i0, i1]
