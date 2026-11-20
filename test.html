@@ -310,6 +310,8 @@ tr.night td:first-child{box-shadow:inset 3px 0 0 var(--elev-line)}
 .wa .wrot{display:block;line-height:0}
 .wa .wring{display:grid;place-items:center;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.45),0 0 0 1.5px rgba(21,32,42,.35)}
 .wa .wring svg{filter:none}
+/* Sortie : flèches sur la trace, taille et couleur selon la force du vent, pastille une flèche sur deux (20/11/2026) */
+.wa2{line-height:0}.wa2 svg{display:block;filter:drop-shadow(0 1px 1.2px rgba(0,0,0,.4))}
 /* animation : la flèche avance dans le sens du vent, plus vite et plus loin quand il souffle fort */
 .anim .wa .wmove{animation:wdrift var(--d,2s) ease-in-out infinite;animation-delay:var(--dl,0s)}
 .anim .wa .wmove.calm{animation-name:wbreath}
@@ -4291,11 +4293,38 @@ function renderWindArrows() {
 }
 // flèches de vent sur la carte m, pour les points rg = [i0, i1] (km affichés depuis kOff) ; renvoie le calque
 const TAF_BADGE_KM = 10, TAF_BADGE_MIN = 3, TAF_BADGE_MAX = 6; // Vélotaf : une pastille tous les ~10 km (départ et arrivée compris), de 3 à 6
+// Page Sortie (20/11/2026, maquette « flèches sur la trace ») : une flèche tous les ~ARROW_RIDE px, grosseur et couleur selon la force du vent ;
+// une pastille (ciel, température, vent) sous une flèche sur deux, sans chevauchement.
+const ARROW_RIDE = 34, arrowRideSz = ws => clamp(12 + ws * 0.45, 12, 28);
+function drawArrowsRide(map, rg, kOff, layer, showS) {
+  const P = S.P, view = map.getBounds().pad(0.2), pills = [], box = [88, 26];
+  let run = ARROW_RIDE / 2, prev = null, n = 0;
+  for (let i = rg[0]; i <= rg[1]; i++) {
+    const p = P.pts[i], px = map.latLngToLayerPoint([p.lat, p.lon]);
+    if (prev) run += px.distanceTo(prev);
+    prev = px;
+    if (run < ARROW_RIDE || !view.contains([p.lat, p.lon])) continue;
+    const t = S.tl.times[i], w = wxAt(sIdx(P.d[i]), t);
+    if (!w) continue;
+    run = 0;
+    const head = w.ws * Math.cos((w.wd - P.b[i]) * RAD), [, col, lbl] = windStrength(w.ws), sz = Math.round(arrowRideSz(w.ws));
+    const tip = T("<b>km {0}</b> · passage {1}<br>{2}{3} · {4} °C{5}<br>Vent de {6} : {7} km/h ({8}){9}<br>Pour vous : {10}", [fD(P.d[i] - (kOff || 0)), hm.format(new Date(t)), skyLabel(w.code, w.day), isFinite(w.cc) ? T(' (nuages {0} %)', [n0(w.cc)]) : '', fT(w.temp), w.pr >= 0.1 ? T(" · pluie {0} mm/h", [fR(w.pr)]) : '', compass(w.wd), fV(w.ws), lbl.toLowerCase(), isFinite(w.gust) ? T("<br>Rafales {0} km/h", [fV(w.gust)]) : '', relLabel(head).txt]);
+    const html = `<div class="wa2"><svg viewBox="0 0 24 24" width="${sz}" height="${sz}" style="transform:rotate(${(w.wd + 180) % 360}deg)"><path d="${WARROW}" fill="${col}" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" paint-order="stroke"/></svg></div>`;
+    L.marker([p.lat, p.lon], { icon: L.divIcon({ html, className: '', iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2] }), keyboard: false }).bindTooltip(tip).addTo(layer);
+    if (n++ % 2 || pills.some(q => badgeHit([px.x, px.y], q, box))) continue;
+    pills.push([px.x, px.y]);
+    const sky = showS ? skySvg(w, 15) : '';
+    const ph = `<div class="wa"><b>${sky}<span class="wt">${fT(w.temp)}°</span><span class="ww">${fV(w.ws)}<small>${UL.kmh}</small></span></b></div>`;
+    L.marker([p.lat, p.lon], { icon: L.divIcon({ html: ph, className: '', iconSize: [110, 20], iconAnchor: [55, -(sz / 2 + 2)] }), keyboard: false }).bindTooltip(tip).addTo(layer);
+  }
+  return layer;
+}
 function drawArrowsOn(m, rg, kOff, noArrows) {
   const layer = L.layerGroup().addTo(m), map = m, windLayer = layer;
   const showA = !noArrows && $('#arrowsOn').checked, showS = noArrows || $('#skyOn').checked;
   if (!S.wx || !S.tl || !rg || (!showA && !showS)) return layer; // plusieurs tours : pas de vent sur la carte
   { const sz = map.getSize(); if (!sz.x || !sz.y) return layer; } // carte masquée (Commute : la grande carte est cachée) : getBounds donnait NaN et arrêtait tout le calcul (bug du 20/11/2026)
+  if (showA && S.mode === 'ride') return drawArrowsRide(m, rg, kOff, layer, showS);
   // Une flèche tous les ~40 px le long de la trace, quel que soit le zoom, et seulement dans la zone visible.
   // Entre deux points météo, la flèche prend le point le plus proche à l'heure de passage à cet endroit.
   const P = S.P, view = map.getBounds().pad(0.2), shown = [], box = badgeBox(showA, showS);
@@ -4554,18 +4583,27 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
   const exA = o.arrows ?? $('#arrowsOn').checked, exS = o.sky ?? $('#skyOn').checked;
   const rgx = o.rg || tripRange();
   if (S.wx && rgx && (exA || exS)) {
-    const arrow = new Path2D(WARROW), shown = [], box = badgeBox(exA, exS);
-    let run = ARROW_GAP / 2, prev = null;
+    const arrow = new Path2D(WARROW), shown = [], box = badgeBox(exA, exS), rideStyle = exA && S.mode === 'ride';
+    let run = (rideStyle ? ARROW_RIDE : ARROW_GAP) / 2, prev = null, nA = 0;
     for (let i = rgx[0]; i <= rgx[1]; i++) {
       const [x, y] = pt(P.pts[i].lat, P.pts[i].lon);
       if (prev) run += Math.hypot(x - prev[0], y - prev[1]);
       prev = [x, y];
-      if (run < ARROW_GAP || x < x0 - 20 || y < y0 - 20 || x > x0 + W + 20 || y > y0 + H + 20) continue;
-      if (shown.some(q => badgeHit([x, y], q, box))) continue;
+      if (run < (rideStyle ? ARROW_RIDE : ARROW_GAP) || x < x0 - 20 || y < y0 - 20 || x > x0 + W + 20 || y > y0 + H + 20) continue;
+      if (!rideStyle && shown.some(q => badgeHit([x, y], q, box))) continue;
       const w = wxAt(sIdx(P.d[i]), S.tl.times[i]); if (!w) continue;
-      run = 0; shown.push([x, y]);
-      const sz = ringSize(w.ws), k = 22 / 24;
-      if (exA) {
+      run = 0;
+      let sz = ringSize(w.ws), k = 22 / 24, showPill = true;
+      if (rideStyle) {
+        sz = Math.round(arrowRideSz(w.ws)); k = sz / 24;
+        c.save(); c.shadowColor = 'rgba(0,0,0,.4)'; c.shadowBlur = 2; c.shadowOffsetY = 1;
+        c.translate(x, y); c.rotate(((w.wd + 180) % 360) * RAD); c.scale(k, k); c.translate(-12, -12);
+        c.lineWidth = 1.8 / k * 1; c.lineJoin = 'round'; c.strokeStyle = '#fff'; c.stroke(arrow); c.shadowColor = 'transparent';
+        c.fillStyle = windStrength(w.ws)[1]; c.fill(arrow); c.restore();
+        showPill = !(nA++ % 2) && !shown.some(q => badgeHit([x, y], q, [88, 26]));
+        if (showPill) shown.push([x, y]); else continue;
+      } else { shown.push([x, y]); }
+      if (exA && !rideStyle) {
         c.save(); c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 3; c.shadowOffsetY = 1;
         c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, sz / 2, 0, Math.PI * 2); c.fill(); c.shadowColor = 'transparent';
         c.strokeStyle = 'rgba(21,32,42,.35)'; c.lineWidth = 1.5; c.stroke();
