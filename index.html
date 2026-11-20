@@ -656,6 +656,7 @@ dialog.login .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
 .duo-kpi .dk-p .dk-g{background:none;padding:0;font-weight:400;color:var(--muted)}
 @media (max-width:560px){.duo-kpi{flex-wrap:wrap}.duo-kpi>div{flex:1 1 50%;border-bottom:1px solid var(--line)}.duo-kpi>div:last-child{flex:1 1 100%;border-bottom:0}}
 body[data-mode="taf"] #stats{display:none}
+body[data-mode="taf"] #chartCard{display:none}
 .duo-map{height:300px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
 .duo-col > canvas{display:block;cursor:crosshair;touch-action:pan-y;background:var(--bg);border-radius:8px}
 .duo-key{padding:0 14px 12px;margin:6px 0 0}
@@ -3582,7 +3583,7 @@ async function trendFetch(url) {
 function applyTrendList() { const on = $('#trendListOn').checked; $('#trendList').hidden = $('#trendNote').hidden = !on;
   try { localStorage.setItem('pmr-trend-list', on ? '1' : '0'); } catch (e) {}
   if (on) { const row = $('#trendList .tr-row.on'); if (row) $('#trendList').scrollTop = Math.max(0, row.offsetTop - 34); } }
-try { if (localStorage.getItem('pmr-trend-list') === '0') $('#trendListOn').checked = false; } catch (e) {}
+try { if (!localStorage.getItem('pmr-open2')) { localStorage.setItem('pmr-open2', '1'); localStorage.removeItem('pmr-rows'); localStorage.removeItem('pmr-trend-list'); } if (localStorage.getItem('pmr-trend-list') === '0') $('#trendListOn').checked = false; } catch (e) {}
 $('#trendListOn').addEventListener('change', applyTrendList); applyTrendList();
 const TR_CONF = LANG === 'fr' ? ['bonne', 'moyenne', 'faible'] : ['good', 'medium', 'low']; // sans T : « faible » est déjà traduit « light » (vent)
 async function trendUpdate() {
@@ -8205,7 +8206,7 @@ $('#revBtn').addEventListener('click', () => {
 $('#csv').addEventListener('click', exportCsv);
 // Feuille de route : on peut masquer toutes les lignes (choix mémorisé). L'export CSV reste complet.
 function applyRows() { $('#rowsWrap').hidden = !$('#rowsOn').checked; try { localStorage.setItem('pmr-rows', $('#rowsOn').checked ? '1' : '0'); } catch (e) {} }
-try { const r = localStorage.getItem('pmr-rows'); if (r === '0' || (r == null && matchMedia('(max-width:700px)').matches)) $('#rowsOn').checked = false; } catch (e) {} // repliée par défaut sur téléphone
+try { if (!localStorage.getItem('pmr-open2')) { localStorage.setItem('pmr-open2', '1'); localStorage.removeItem('pmr-rows'); localStorage.removeItem('pmr-trend-list'); } const r = localStorage.getItem('pmr-rows'); if (r === '0') $('#rowsOn').checked = false; } catch (e) {} // dépliée par défaut (20/11/2026, demande d'Antoine) ; remise à zéro une fois
 $('#rowsOn').addEventListener('change', applyRows);
 // liste des lieux de la page Ultra : repliable (les catégories et les marqueurs de la carte restent), choix mémorisé
 function applyPoiList() { $('#poiListWrap').style.display = $('#poiListOn').checked && $('#poiOn').checked ? '' : 'none'; try { localStorage.setItem('pmr-poi-list2', $('#poiListOn').checked ? '1' : '0'); } catch (e) {} }
