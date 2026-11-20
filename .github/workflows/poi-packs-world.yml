@@ -54,9 +54,9 @@ jobs:
               iso = p.get("iso3166-1:alpha2") or []
               if isinstance(iso, str): iso = [iso]
               par = p.get("parent")
-              cc = ("US-" + p["id"].upper()[:20]) if par == "us" else ("-".join(iso) if iso else p["id"])
+              cc = ("US-" + p["id"].upper().removeprefix("US-")[:20]) if par == "us" else ("-".join(iso) if iso else p["id"])
               rows.append({"id": p["id"], "name": p.get("name", p["id"]), "cc": cc, "url": p["urls"]["pbf"],
-                           "slug": ("us-" if par == "us" else "") + p["id"]})
+                           "slug": ("us-" if par == "us" and not p["id"].startswith("us-") else "") + p["id"]})
           only = {x.strip().removesuffix(".ndjson.gz") for x in os.environ.get("ONLY", "").split(",") if x.strip()}
           if only: rows = [r for r in rows if r["slug"] in only]
           rows.sort(key=lambda r: r["slug"])
