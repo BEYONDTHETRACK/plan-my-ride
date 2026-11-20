@@ -1223,6 +1223,12 @@ function pDupHtml(p) {
   h += '<div><button type="button" class="b" style="background:var(--brand);border-color:var(--brand);color:#14201b" data-merge="' + p.id + '"' + (ch ? '' : ' disabled') + '>' + (c ? 'Fusionner et valider' : ch === 'none' ? 'Pas un doublon, valider' : 'Choisis d\'abord une option') + '</button></div></div>';
   return h;
 }
+const APP_PAGE = 'index.html';
+function pMapLink(lat, lon, key) { return './' + APP_PAGE + '#carte=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6) + (/^p:/.test(key || '') ? ',' + key : ''); }
+async function pOpenOsm(key, w) { // avis sur un point OSM : coordonnées lues dans osm_poi
+  const { data } = await sb.from('osm_poi').select('lat,lon').eq('id', key).maybeSingle();
+  if (data) w.location = pMapLink(data.lat, data.lon, ''); else { w.close(); alertMsg('Point OpenStreetMap introuvable dans la base Sillage.'); }
+}
 // Deux avis du même cycliste sur le même lieu à moins de 7 jours d'écart : proposer de les fusionner (20/11/2026).
 const REV_MERGE_MS = 7 * 86400000;
 function pRevTwin(r) {
@@ -1255,6 +1261,11 @@ async function pRevMerge(id) {
   Object.assign(a, { rating: m.rating, comment: m.comment, photo: m.photo, reports: m.reports, status: m.status });
   P.revs = P.revs.filter(y => y.id !== r.id); pBadge(); pRender();
 }
+function pRevMapBtn(r) {
+  const p = /^p:/.test(r.poi_key) ? P.pois.find(x => 'p:' + x.id === r.poi_key) : null;
+  if (p) return '<a class="b sm" href="' + esc(pMapLink(p.lat, p.lon, r.poi_key)) + '" target="_blank" rel="noopener">Voir sur la carte</a>';
+  return /^p:/.test(r.poi_key) ? '' : '<button type="button" class="b sm" data-revosm="' + esc(r.poi_key) + '">Voir sur la carte</button>';
+}
 function pRender() {
   if (!P.loaded) { $('pList').innerHTML = '<li class="muted">Chargement…</li>'; return; }
   if (P.err) { $('pList').innerHTML = '<li class="msg err">Lecture impossible : ' + esc(P.err) + (/relation|does not exist|schema cache/i.test(P.err) ? ' — le script supabase/sql/2026-10-31_poi.sql n\'est pas encore appliqué.' : '') + '</li>'; return; }
@@ -1274,14 +1285,14 @@ function pRender() {
         + '<span class="meta">Ajouté par ' + 'un·e cycliste' + ' · ' + pAgo(p.created_at) + ' · ' + nR.length + ' avis</span>'
         + (p.details ? '<span class="txt">' + esc(p.details) + '</span>' : '') + '</div>'
         + (ph ? '<a href="' + esc(PHOTO + ph.photo) + '" target="_blank" rel="noopener"><img class="ph" src="' + esc(PHOTO + ph.photo) + '" alt="Photo jointe" loading="lazy"></a>' : '')
-        + pStatus(p.status, p.osm_ref) + '<div class="acts"><a class="b sm" href="https://www.openstreetmap.org/?mlat=' + p.lat + '&mlon=' + p.lon + '#map=18/' + p.lat + '/' + p.lon + '" target="_blank" rel="noopener">Voir</a>' + pActs('p', p) + '</div>' + pDupHtml(p) + '</li>'; }).join('');
+        + pStatus(p.status, p.osm_ref) + '<div class="acts"><a class="b sm" href="' + esc(pMapLink(p.lat, p.lon, 'p:' + p.id)) + '" target="_blank" rel="noopener">Voir sur la carte</a><a class="b sm" href="https://www.openstreetmap.org/?mlat=' + p.lat + '&mlon=' + p.lon + '#map=18/' + p.lat + '/' + p.lon + '" target="_blank" rel="noopener">Voir</a>' + pActs('p', p) + '</div>' + pDupHtml(p) + '</li>'; }).join('');
   } else {
     const nm = r => r.poi_name || (P.pois.find(p => 'p:' + p.id === r.poi_key) || {}).name || r.poi_key;
     html = P.revs.filter(keep).map(r => '<li class="pit"><div class="main"><div class="nm">' + (r.rating ? '<span class="stars" aria-label="' + r.rating + ' sur 5">' + '★★★★★'.slice(0, r.rating) + '☆☆☆☆☆'.slice(0, 5 - r.rating) + '</span>' : '')
       + '<b style="font-size:15px">sur « ' + esc(nm(r)) + ' »</b>' + (/^p:/.test(r.poi_key) ? '' : '<span class="ty">point OSM</span>') + (r.reports > 0 ? '<span class="prep">⚑ Signalé ' + r.reports + ' fois</span>' : '') + '</div>'
       + (r.comment ? '<span class="txt">' + esc(r.comment) + '</span>' : '') + '<span class="meta">Par ' + 'un·e cycliste' + ' · ' + pAgo(r.created_at) + '</span></div>'
       + (r.photo ? '<a href="' + esc(PHOTO + r.photo) + '" target="_blank" rel="noopener"><img class="ph" src="' + esc(PHOTO + r.photo) + '" alt="Photo jointe" loading="lazy"></a>' : '')
-      + pStatus(r.status) + '<div class="acts">' + pActs('r', r) + '</div>' + pRevMergeHtml(r) + '</li>').join('');
+      + pStatus(r.status) + '<div class="acts">' + pRevMapBtn(r) + pActs('r', r) + '</div>' + pRevMergeHtml(r) + '</li>').join('');
   }
   $('pList').innerHTML = html || '<li class="card pad empty" style="text-align:center">Rien ici. Tout est à jour.</li>';
 }
@@ -1304,6 +1315,7 @@ $('pList').addEventListener('click', async e => {
     if (b.dataset.undo === 'p' && x && x.osm_ref) { const { error } = await sb.rpc('poi_unmerge', { p_id: id }); if (error) return alertMsg(error.message); x.osm_ref = null; x.status = 'pending'; P.dup[id] = { state: 'wait', list: [] }; P.q.push(x); pBadge(); pRender(); return pDupPump(); }
     return pSet(b.dataset.undo, id, 'pending');
   }
+  if (b.dataset.revosm) { const w = window.open('about:blank', '_blank'); return pOpenOsm(b.dataset.revosm, w); }
   if (b.dataset.revmerge) { b.disabled = true; return pRevMerge(b.dataset.revmerge); }
   if (b.dataset.redup) { const p = P.pois.find(y => y.id === b.dataset.redup); P.dup[p.id] = { state: 'wait', list: [] }; P.q.push(p); return pDupPump(); }
   if (b.dataset.pick) { P.choice[b.dataset.pick] = b.dataset.ref; return pRender(); }

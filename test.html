@@ -9108,7 +9108,15 @@ $('#meMotion').addEventListener('click', e => { const b = e.target.closest('butt
 $('#meFont').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (b && b.getAttribute('aria-pressed') !== 'true') a11ySet({ font: b.dataset.v }); });
 try { if (sessionStorage.getItem('pmr-open-me')) { sessionStorage.removeItem('pmr-open-me'); if (!document.body.classList.contains('gated')) setTimeout(meOpen, 0); } } catch (e) {}
 // lien direct vers la Carte (#carte, depuis le rail de la supervision, 03/11/2026)
-if (location.hash === '#carte') { history.replaceState(null, '', location.pathname + location.search); if (!document.body.classList.contains('gated')) setTimeout(pmOpen, 0); }
+// #carte=lat,lon[,p:<id>] : la Carte ouverte sur un point (lien « Voir sur la carte » de la supervision, 20/11/2026)
+{ const m = /^#carte(?:=(-?[\d.]+),(-?[\d.]+)(?:,(p:[0-9a-f-]{36}))?)?$/.exec(location.hash);
+  if (m) { history.replaceState(null, '', location.pathname + location.search);
+    if (!document.body.classList.contains('gated')) setTimeout(async () => {
+      if (m[1]) { let fo = { lat: +m[1], lon: +m[2] };
+        if (m[3]) try { const sb = await sbIfLogged(); const { data } = await sb.from('poi').select('id,user_id,type,name,lat,lon,details,hours,contact,osm_ref,status,created_at').eq('id', m[3].slice(2)).maybeSingle();
+          if (data) fo = { src: 'usr', key: m[3], type: data.type, name: data.name, lat: data.lat, lon: data.lon, poi: data }; } catch (e) {}
+        PM.focusTo = fo; }
+      pmOpen(); }, 0); } }
 // Moi · Mon trajet Commute (06/11/2026) : aller (pmr-taf-route) et retour (pmr-taf-ret, '' = même trace à l'envers)
 const ME = { tafOther: false }; // « Une autre trace » choisi mais pas encore de parcours
 /* « Points ajoutés » de la page Moi (06/11/2026, demande d'Antoine) : liste des points créés par le compte ;
@@ -9972,7 +9980,7 @@ async function pmOpen() {
     else if (fresh && !PM.placing) pmFitRoute();
     pmLoadOsm(); pmLoadUsr(true);
     pmLocResume(!fresh && !fo); pmCompSync();
-    if (fo) { PM.usr.set(fo.poi.id, fo); pmRender(); pmShow(fo); }
+    if (fo && fo.poi) { PM.usr.set(fo.poi.id, fo); pmRender(); pmShow(fo); }
     else if (PK_ON && S.mode === 'ultra') pkWarn().catch(() => {}); // trace Ultra : pays sans pack sur l'appareil
   }, 30);
 }
