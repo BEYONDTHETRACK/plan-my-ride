@@ -47,6 +47,8 @@ def classify(t):
         return "atelier"
     if a == "device_charging_station" or (a == "charging_station" and t.get("bicycle") in ("yes", "designated")):
         return "recharge"
+    if a == "toilets" and t.get("access") not in ("private", "no", "customers"):
+        return "wc"
     # Types en plus pour la page Ultra (osm_web_put2)
     if a == "fuel":
         return "carburant"
