@@ -5053,12 +5053,13 @@ let chartGeom = null;
 function renderChart() { return S.mode === 'ride' ? renderChartV2() : renderChartV1(); }
 function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti toutes les 30 min, vent posé sur le profil
   const cv = $('#chart'), wrap = $('#chartWrap');
-  const W = Math.max(280, wrap.clientWidth - 12), H = W < 600 ? 300 : 340, dpr = window.devicePixelRatio || 1;
+  const W = Math.max(280, wrap.clientWidth - 12), H = (W < 600 ? 300 : 340) + (S.wx ? 22 : 0), dpr = window.devicePixelRatio || 1;
   cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr;
   const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
   const P = S.P, tl = S.tl;
   // en haut : heures pleines, puis toutes les 30 min depuis le départ le ciel, le ressenti et l'heure ; vent posé sur le profil (échelle de droite)
-  const pad = { l: 44, r: 44, t: 80, b: 26 }, SKY = 16;
+  const RB = S.wx ? 22 : 0; // ruban de la pluie sous le tracé
+  const pad = { l: 44, r: 44, t: 80, b: 26 + RB }, SKY = 16;
   const hasCc = !!S.wx && S.wx.some(L => L && L.cc && L.cc.some(v => isFinite(v)));
   const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
   const wy0 = pad.t + ph; // bas du tracé (l'ancien panneau vent n'existe plus)
@@ -5114,9 +5115,8 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
     // nuages (20/11/2026) : une bande fine en haut du graphique, plus ou moins sombre selon la couverture, sans fondu
     if (hasCc) for (let b = 0; b < nb; b++) { const w = bins[b].w; if (!w || !isFinite(w.cc)) continue;
       const xa = Math.round(X(bins[b].km)), xb = Math.round(X(bins[b + 1].km)); if (xb <= xa) continue;
-      c.fillStyle = `rgba(96,108,121,${(0.08 + 0.8 * clamp(w.cc / 100, 0, 1)).toFixed(3)})`; c.fillRect(xa, pad.t, xb - xa, 7); }
-    // pluie (20/11/2026) : elle tombe des nuages — une barre par heure de roulage accrochée sous la bande des nuages,
-    // bleu transparent sous le vent et les rafales, longueur selon les mm/h, valeur sous la barre
+      c.fillStyle = `rgba(96,108,121,${(0.08 + 0.8 * clamp(w.cc / 100, 0, 1)).toFixed(3)})`; c.fillRect(xa, pad.t, xb - xa, 12); }
+    // pluie : une case par heure de roulage, du km atteint au début de l'heure à celui de la fin (ruban sous le tracé)
     const kmAtT = t => { const TT = tl.times; let lo = 0, hi = P.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (TT[m] < t) lo = m + 1; else hi = m; } return P.d[lo]; };
     const rbars = [];
     for (let h0 = Math.floor(tl.start / 3600e3) * 3600e3; h0 < tl.end; h0 += 3600e3) {
@@ -5125,13 +5125,18 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
       const w = wxKm((ka + kb) / 2, (ta + tb) / 2);
       if (w && w.pr >= 0.05) rbars.push({ x: X(ka), x2: X(kb), pr: w.pr });
     }
-    if (rbars.length) {
-      const pMax = Math.max(2, ...rbars.map(r => r.pr)), rc = cssVar('--rain');
-      c.textAlign = 'center'; c.textBaseline = 'top'; const rTop = pad.t + (hasCc ? 9 : 0);
+    // ruban de pluie sous le tracé (20/11/2026) : bleu plus soutenu quand il pleut plus, mm/h écrits dedans
+    {
+      const ry = pad.t + ph + 4, rh = 16, rc = cssVar('--rain');
+      c.globalAlpha = .5; c.fillStyle = line; c.fillRect(pad.l, ry, pw, rh); c.globalAlpha = 1;
+      c.font = font(9.5); c.fillStyle = muted; c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillText(T('pluie'), pad.l - 5, ry + rh / 2);
+      const pMax = Math.max(4, ...rbars.map(r => r.pr));
+      c.textAlign = 'center';
       for (const r of rbars) {
-        const bw = Math.max(2, r.x2 - r.x - 1.5), hh = Math.max(3, r.pr / pMax * ph * .45), bx = r.x + 0.75, by = rTop;
-        c.globalAlpha = .4; c.fillStyle = rc; c.fillRect(bx, by, bw, hh); c.globalAlpha = 1; c.fillRect(bx, by + hh - 2, bw, 2);
-        if (bw >= 20 && r.pr >= 0.1) { c.font = `600 10px ${mono}, monospace`; c.fillText(fR(r.pr) + ' ' + UL.mmh, bx + bw / 2, by + hh + 2); }
+        const bw = Math.max(2, r.x2 - r.x - 1.5), bx = r.x + 0.75, op = Math.min(1, .3 + r.pr / pMax * .7);
+        c.globalAlpha = op; c.fillStyle = rc; c.fillRect(bx, ry, bw, rh); c.globalAlpha = 1;
+        if (r.pr >= 0.1) { c.font = `600 9.5px ${mono}, monospace`; const t = fR(r.pr) + ' ' + UL.mmh;
+          if (c.measureText(t).width + 6 <= bw) { c.fillStyle = op > .6 ? '#fff' : ink; c.fillText(t, bx + bw / 2, ry + rh / 2 + .5); } }
       }
     }
     // vent moyen en aire colorée selon son effet (rouille de face, vert de dos, doré de travers ou faible) ; rafales en pointillé
@@ -5195,7 +5200,7 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
   // axe km
   c.font = font(10.5); c.fillStyle = muted; c.textAlign = 'center'; c.textBaseline = 'top';
   const kK = uD(1), kStep = niceStep(P.total * kK / Math.max(3, Math.floor(pw / 80))); // repères en km ou en miles
-  for (let k = 0; k <= P.total * kK + 1e-6; k += kStep) { const x = X(k / kK); c.fillText(n0(k) + (k === 0 ? ' ' + UL.km : ''), x, pad.t + ph + 6); }
+  for (let k = 0; k <= P.total * kK + 1e-6; k += kStep) { const x = X(k / kK); c.fillText(n0(k) + (k === 0 ? ' ' + UL.km : ''), x, pad.t + ph + RB + 6); }
   // heures pleines en haut
   const yHour = 14, ySky = 20, yTemp = 52, yTime = 64;
   const span = (tl.end - tl.start) / 3600e3;
