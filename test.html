@@ -5111,8 +5111,29 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
   c.strokeStyle = line; c.lineWidth = 1;
   for (let ed = Math.ceil(eMin * eK / eStep) * eStep; ed <= eMax * eK; ed += eStep) { const y = Ye(ed / eK); c.beginPath(); c.moveTo(pad.l, y); c.lineTo(pad.l + pw, y); c.globalAlpha = .6; c.stroke(); c.globalAlpha = 1; c.fillText(Math.round(ed) + ' ' + UL.m, pad.l - 5, y); }
   if (S.wx) {
-    // nuages : plafond accroché en haut du graphique, d'autant plus épais et gris que le ciel est couvert
-    if (hasCc) drawCloudCeiling(c, bins, X, pad.l, pad.t, pw, ph);
+    // nuages (20/11/2026) : une bande fine en haut du graphique, plus ou moins sombre selon la couverture, sans fondu
+    if (hasCc) for (let b = 0; b < nb; b++) { const w = bins[b].w; if (!w || !isFinite(w.cc)) continue;
+      const xa = Math.round(X(bins[b].km)), xb = Math.round(X(bins[b + 1].km)); if (xb <= xa) continue;
+      c.fillStyle = `rgba(96,108,121,${(0.08 + 0.8 * clamp(w.cc / 100, 0, 1)).toFixed(3)})`; c.fillRect(xa, pad.t, xb - xa, 7); }
+    // pluie (20/11/2026) : elle tombe des nuages — une barre par heure de roulage accrochée sous la bande des nuages,
+    // bleu transparent sous le vent et les rafales, longueur selon les mm/h, valeur sous la barre
+    const kmAtT = t => { const TT = tl.times; let lo = 0, hi = P.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (TT[m] < t) lo = m + 1; else hi = m; } return P.d[lo]; };
+    const rbars = [];
+    for (let h0 = Math.floor(tl.start / 3600e3) * 3600e3; h0 < tl.end; h0 += 3600e3) {
+      const ta = Math.max(tl.start, h0), tb = Math.min(tl.end, h0 + 3600e3), ka = kmAtT(ta), kb = kmAtT(tb);
+      if (kb - ka <= 0) continue;
+      const w = wxKm((ka + kb) / 2, (ta + tb) / 2);
+      if (w && w.pr >= 0.05) rbars.push({ x: X(ka), x2: X(kb), pr: w.pr });
+    }
+    if (rbars.length) {
+      const pMax = Math.max(2, ...rbars.map(r => r.pr)), rc = cssVar('--rain');
+      c.textAlign = 'center'; c.textBaseline = 'top'; const rTop = pad.t + (hasCc ? 9 : 0);
+      for (const r of rbars) {
+        const bw = Math.max(2, r.x2 - r.x - 1.5), hh = Math.max(3, r.pr / pMax * ph * .45), bx = r.x + 0.75, by = rTop;
+        c.globalAlpha = .4; c.fillStyle = rc; c.fillRect(bx, by, bw, hh); c.globalAlpha = 1; c.fillRect(bx, by + hh - 2, bw, 2);
+        if (bw >= 20 && r.pr >= 0.1) { c.font = `600 10px ${mono}, monospace`; c.fillText(fR(r.pr) + ' ' + UL.mmh, bx + bw / 2, by + hh + 2); }
+      }
+    }
     // vent moyen en aire colorée selon son effet (rouille de face, vert de dos, doré de travers ou faible) ; rafales en pointillé
     const wb = bins.filter(b => b.w);
     if (wb.length) {
@@ -5162,24 +5183,6 @@ function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti t
       c.font = font(10.5); c.fillStyle = muted; c.textAlign = 'left'; c.textBaseline = 'middle';
       for (let v = 0; v <= vMax * vK + 1e-6; v += vStep) c.fillText(n0(v), pad.l + pw + 5, Yv(v / vK));
       c.textBaseline = 'bottom'; c.fillText(UL.kmh, pad.l + pw + 5, Yv(vMax) - 9);
-    }
-    // pluie : une barre par heure de roulage, du km atteint au début de l'heure à celui de la fin, hauteur selon les mm/h
-    const kmAtT = t => { const TT = tl.times; let lo = 0, hi = P.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (TT[m] < t) lo = m + 1; else hi = m; } return P.d[lo]; };
-    const rbars = [];
-    for (let h0 = Math.floor(tl.start / 3600e3) * 3600e3; h0 < tl.end; h0 += 3600e3) {
-      const ta = Math.max(tl.start, h0), tb = Math.min(tl.end, h0 + 3600e3), ka = kmAtT(ta), kb = kmAtT(tb);
-      if (kb - ka <= 0) continue;
-      const w = wxKm((ka + kb) / 2, (ta + tb) / 2);
-      if (w && w.pr >= 0.05) rbars.push({ x: X(ka), x2: X(kb), pr: w.pr });
-    }
-    if (rbars.length) {
-      const pMax = Math.max(2, ...rbars.map(r => r.pr)), rc = cssVar('--rain');
-      c.font = font(9.5); c.textAlign = 'center'; c.textBaseline = 'bottom';
-      for (const r of rbars) {
-        const bw = Math.max(2, r.x2 - r.x - 1.5), hh = Math.max(2, r.pr / pMax * ph * .45), bx = r.x + 0.75, by = pad.t + ph - hh;
-        c.globalAlpha = .85; c.fillStyle = rc; c.fillRect(bx, by, bw, hh); c.globalAlpha = 1;
-        if (bw >= 20 && r.pr >= 0.1) { c.fillStyle = rc; c.fillText(n1(r.pr), bx + bw / 2, by - 2); }
-      }
     }
   }
   // mode tours : trait pointillé et numéro au début de chaque tour
