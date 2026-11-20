@@ -1782,7 +1782,7 @@ html.demo-web body.guest #libPage .lp-tools{display:flex}html.demo-web #libPage 
 html.demo-web #tabOut,html.demo-web #tabMe,html.demo-web .rail-admin,html.demo-web #pmAdd,html.demo-web #outAll,html.demo-web .lp-imp,html.demo-web label.imp-btn,html.demo-web #loginLink,html.demo-web #logoutLink,html.demo-web #meDel,html.demo-web #alBox,html.demo-web #exportImg,html.demo-web #exportImg2,html.demo-web .adm{display:none!important}
 .sgl{position:absolute!important;inset:0;z-index:0;pointer-events:none;overflow:hidden}.sgl .maplibregl-canvas{outline:none}
 .leaflet-control-layers-base label{white-space:nowrap}
-body[data-mode="ride"] .chart-keys .ck-v1,body:not([data-mode="ride"]) .chart-keys .ck-v2{display:none}
+body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([data-mode="ride"]):not([data-mode="ultra"]) .chart-keys .ck-v2{display:none}
 </style>
 </head>
 <body>
@@ -5050,7 +5050,7 @@ function idxAtKm(km) { const d = S.P.d; let lo = 0, hi = S.P.n - 1; while (lo < 
 
 /* graphique */
 let chartGeom = null;
-function renderChart() { return S.mode === 'ride' ? renderChartV2() : renderChartV1(); }
+function renderChart() { return S.mode === 'ride' || S.mode === 'ultra' ? renderChartV2() : renderChartV1(); }
 function renderChartV2() { // profil de la page Sortie (20/11/2026) : ressenti toutes les 30 min, vent posé sur le profil
   const cv = $('#chart'), wrap = $('#chartWrap');
   const W = Math.max(280, wrap.clientWidth - 12), H = (W < 600 ? 300 : 340) + (S.wx ? 22 : 0), dpr = window.devicePixelRatio || 1;
