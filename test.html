@@ -9990,7 +9990,11 @@ async function pmOpen() {
     else if (fresh && !PM.placing) pmFitRoute();
     pmLoadOsm(); pmLoadUsr(true);
     pmLocResume(!fresh && !fo); pmCompSync();
-    if (fo && fo.poi) { PM.usr.set(fo.poi.id, fo); pmRender(); pmShow(fo); }
+    if (fo && fo.poi) { // le point demandé doit être visible, même si son type ou la source « Par les cyclistes » était masqué
+      if (fo.type && !PM.on.has(fo.type)) pmTypesSet([...PM.on, fo.type]);
+      if (!PM.src.usr) { PM.src.usr = true; const sb = $('#pmSrcUsr'); if (sb) sb.setAttribute('aria-pressed', 'true'); }
+      PM.usr.set(fo.poi.id, fo); pmRender(); pmShow(fo);
+    }
     else if (PK_ON && S.mode === 'ultra') pkWarn().catch(() => {}); // trace Ultra : pays sans pack sur l'appareil
   }, 30);
 }
