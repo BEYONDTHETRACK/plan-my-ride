@@ -309,12 +309,14 @@ tr.night td:first-child{box-shadow:inset 3px 0 0 var(--elev-line)}
 .wa .wrot{display:block;line-height:0}
 .wa .wring{display:grid;place-items:center;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.45),0 0 0 1.5px rgba(21,32,42,.35)}
 .wa .wring svg{filter:none}
+/* Sortie : flèches sur la trace, taille et couleur selon la force du vent, pastille une flèche sur deux (20/11/2026) */
+.wa2{line-height:0}.wa2 svg{display:block;filter:drop-shadow(0 1px 1.2px rgba(0,0,0,.4))}
 /* animation : la flèche avance dans le sens du vent, plus vite et plus loin quand il souffle fort */
-.anim .wa .wmove{animation:wdrift var(--d,2s) ease-in-out infinite;animation-delay:var(--dl,0s)}
-.anim .wa .wmove.calm{animation-name:wbreath}
+.anim .wa .wmove,.anim .wa2 .wmove{animation:wdrift var(--d,2s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+.anim .wa .wmove.calm,.anim .wa2 .wmove.calm{animation-name:wbreath}
 @keyframes wdrift{0%{transform:translateY(var(--a,3px));opacity:.6}55%{transform:translateY(calc(var(--a,3px) * -1));opacity:1}100%{transform:translateY(var(--a,3px));opacity:.6}}
 @keyframes wbreath{0%,100%{opacity:.55}50%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.anim .wa .wmove{animation:none}}
+@media (prefers-reduced-motion:reduce){.anim .wa .wmove,.anim .wa2 .wmove{animation:none}}
 .wa b{display:inline-flex;align-items:center;gap:2px;font:600 10.5px/1 var(--f-mono);color:#15202a;background:rgba(255,255,255,.92);border-radius:7px;padding:2px 4px;box-shadow:0 0 0 1px rgba(0,0,0,.15);white-space:nowrap}
 .wa b .ww{margin-left:3px;padding-left:4px;border-left:1px solid rgba(0,0,0,.2)}
 .wa b small{font-size:8.5px;font-weight:500;color:#46525e;margin-left:1px}
@@ -4003,14 +4005,19 @@ function sampleRangeOf(r) {
   if (k0 < 0) k0 = 0; if (k1 <= k0) k1 = Math.min(s.length - 1, k0 + 1);
   return [k0, k1];
 }
+// Page Sortie, onglet « Vent ressenti » : trace en filet clair à contour sombre (les flèches portent le vent) ; les autres onglets gardent la trace colorée
+const rideLike = () => S.mode === 'ride' || S.mode === 'ultra'; // flèches à hampe : Sortie, Ultra (et Commute pour les flèches seulement)
+const ridePlain = () => rideLike() && !['temp', 'rain', 'sun'].includes(S.metric);
 function renderMap() {
   if (!map) return;
   if (routeLayer) routeLayer.remove();
   routeLayer = L.layerGroup().addTo(map);
   const P = S.P, ll = P.pts.map(p => [p.lat, p.lon]);
-  L.polyline(ll, { color: '#ffffff', weight: 9, opacity: .85 }).addTo(routeLayer);
+  const plain = ridePlain();
+  if (plain) { L.polyline(ll, { color: '#0a1410', weight: 5.5, opacity: .55 }).addTo(routeLayer); L.polyline(ll, { color: '#ffffff', weight: 3, opacity: .6 }).addTo(routeLayer); }
+  else L.polyline(ll, { color: '#ffffff', weight: 9, opacity: .85 }).addTo(routeLayer);
   const svs = S.samples.map((_, k) => S.wx ? sampleValue(k) : null), [sk0, sk1] = sampleRange();
-  for (let k = sk0; k < sk1; k++) {
+  for (let k = sk0; !plain && k < sk1; k++) {
     const a = S.samples[k].i, b = S.samples[k + 1].i;
     const sv = svs[k + 1] || svs[k];
     L.polyline(ll.slice(a, b + 1), { color: metricColor(sv), weight: 5, opacity: 1 }).addTo(routeLayer);
@@ -4041,11 +4048,64 @@ function renderWindArrows() {
 }
 // flèches de vent sur la carte m, pour les points rg = [i0, i1] (km affichés depuis kOff) ; renvoie le calque
 const TAF_BADGE_KM = 10, TAF_BADGE_MIN = 3, TAF_BADGE_MAX = 6; // Vélotaf : une pastille tous les ~10 km (départ et arrivée compris), de 3 à 6
+// Page Sortie (20/11/2026, maquette « flèches sur la trace ») : une flèche tous les 5 km (règle en km, pas en pixels), grosseur et couleur selon la force du vent ;
+// une pastille (ciel, température, vent) sous une flèche sur deux, sans chevauchement.
+const ARROW_RIDE_PX = 80, PILL_RIDE_EVERY = 4, arrowRideSz = ws => clamp(32 + ws * 0.8, 32, 54), RIDE_ARROW = 'M12 1.5 L17.6 9.2 L14.24 9.2 L14.24 22.5 L9.76 22.5 L9.76 9.2 L6.4 9.2 Z'; // flèche à hampe (forme S1, 20/11/2026) ; une flèche tous les ~60 px de carte, une pastille toutes les 4 flèches
+// pas en km selon le zoom : puissance de 2 (0,25 à 64 km) la plus proche de ARROW_RIDE_PX pixels ; pxKm = pixels pour 1 km sur la carte
+function rideStep(pxKm) { if (!(pxKm > 0)) return 4; return Math.pow(2, clamp(Math.round(Math.log2(ARROW_RIDE_PX / pxKm)), -2, 6)); }
+function rideMarks(rg, pxKm) { // [{ i: indice du point, pill }] pour les points rg = [i0, i1]
+  const P = S.P, d0 = P.d[rg[0]], step = rideStep(pxKm), out = []; let i = rg[0];
+  for (let k = 0; ; k++) {
+    const dk = d0 + step * (k + 1);
+    if (dk > P.d[rg[1]] - step * 0.25) break;
+    while (i < rg[1] && P.d[i] < dk) i++;
+    out.push({ i, pill: k % PILL_RIDE_EVERY === 0 });
+  }
+  return out;
+}
+const pxPerKm = (f) => Math.abs(f(1 / 111.32)); // f(deltaLat) = écart vertical en pixels pour ce décalage de latitude
+function drawArrowsRide(map, rg, kOff, layer, showS, taf) {
+  const P = S.P, view = map.getBounds().pad(0.2), c0 = map.getCenter();
+  const pxKm = pxPerKm(dl => map.latLngToContainerPoint([c0.lat + dl, c0.lng]).y - map.latLngToContainerPoint([c0.lat, c0.lng]).y);
+  for (const mk of rideMarks(rg, pxKm)) {
+    const i = mk.i, p = P.pts[i];
+    if (!view.contains([p.lat, p.lon])) continue;
+    const t = S.tl.times[i], w = wxAt(sIdx(P.d[i]), t);
+    if (!w) continue;
+    const head = w.ws * Math.cos((w.wd - P.b[i]) * RAD), [, col, lbl] = windStrength(w.ws), sz = Math.round(arrowRideSz(w.ws));
+    const tip = T("<b>km {0}</b> · passage {1}<br>{2}{3} · {4} °C{5}<br>Vent de {6} : {7} km/h ({8}){9}<br>Pour vous : {10}", [fD(P.d[i] - (kOff || 0)), hm.format(new Date(t)), skyLabel(w.code, w.day), isFinite(w.cc) ? T(' (nuages {0} %)', [n0(w.cc)]) : '', fT(w.temp), w.pr >= 0.1 ? T(" · pluie {0} mm/h", [fR(w.pr)]) : '', compass(w.wd), fV(w.ws), lbl.toLowerCase(), isFinite(w.gust) ? T("<br>Rafales {0} km/h", [fV(w.gust)]) : '', relLabel(head).txt]);
+    // la pointe de la flèche est sur la trace, le corps de la flèche arrive du côté d'où vient le vent
+    const th = (w.wd + 180) % 360, R = sz, tipY = sz * 1.5 / 24, dx = Math.sin(th * RAD), dy = -Math.cos(th * RAD);
+    // animation : la flèche avance dans le sens du vent, plus vite et plus loin quand il souffle fort (comme avant)
+    const dur = clamp(2.8 - w.ws * 0.05, 0.55, 2.8).toFixed(2), amp = clamp(1.5 + w.ws * 0.12, 1.5, 5).toFixed(1);
+    const dl = (-((mk.i % 7) * 0.37) % dur).toFixed(2), calm = w.ws < 5 ? ' calm' : '';
+    const html = `<div class="wa2" style="position:relative;width:${2 * R}px;height:${2 * R}px"><div style="position:absolute;left:${R - sz / 2}px;top:${R - tipY}px;width:${sz}px;height:${sz}px;transform-origin:50% ${tipY}px;transform:rotate(${th}deg)"><svg class="wmove${calm}" viewBox="0 0 24 24" width="${sz}" height="${sz}" style="--d:${dur}s;--a:${amp}px;--dl:${dl}s"><path d="${RIDE_ARROW}" fill="#fff" stroke="#fff" stroke-width="3.6" stroke-linejoin="round"/><path d="${RIDE_ARROW}" fill="${col}" stroke="#0a1410" stroke-width="1.3" stroke-linejoin="round"/></svg></div></div>`;
+    L.marker([p.lat, p.lon], { icon: L.divIcon({ html, className: '', iconSize: [2 * R, 2 * R], iconAnchor: [R, R] }), keyboard: false, interactive: true }).bindTooltip(tip).addTo(layer);
+    if (taf || !mk.pill) continue;
+    const sky = showS ? skySvg(w, 15) : '';
+    const ph = `<div class="wa"><b>${sky}<span class="wt">${fT(w.temp)}°</span><span class="ww">${fV(w.ws)}<small>${UL.kmh}</small></span></b></div>`;
+    L.marker([p.lat, p.lon], { icon: L.divIcon({ html: ph, className: '', iconSize: [110, 20], iconAnchor: [55 - dx * 46, 10 - dy * 24] }), keyboard: false }).bindTooltip(tip).addTo(layer); // pastille du côté où va le vent, à l'opposé du corps de la flèche
+  }
+  if (taf) { // Commute : pastilles régulièrement réparties (3 à 6), comme avant, à côté de la flèche la plus proche
+    const d0 = P.d[rg[0]], len = P.d[rg[1]] - d0, n = clamp(Math.ceil(len / TAF_BADGE_KM) + 1, TAF_BADGE_MIN, TAF_BADGE_MAX); let i = rg[0];
+    for (let k = 0; k < n; k++) {
+      const dk = d0 + len * k / (n - 1); while (i < rg[1] && P.d[i] < dk) i++;
+      const p = P.pts[i], t = S.tl.times[i], w = wxAt(sIdx(P.d[i]), t); if (!w || !view.contains([p.lat, p.lon])) continue;
+      const th = (w.wd + 180) % 360, dx = Math.sin(th * RAD), dy = -Math.cos(th * RAD), [, , lbl] = windStrength(w.ws);
+      const tip = T("<b>km {0}</b> · passage {1}<br>{2}{3} · {4} °C{5}<br>Vent de {6} : {7} km/h ({8}){9}", [fD(P.d[i] - (kOff || 0)), hm.format(new Date(t)), skyLabel(w.code, w.day), isFinite(w.cc) ? T(' (nuages {0} %)', [n0(w.cc)]) : '', fT(w.temp), w.pr >= 0.1 ? T(" · pluie {0} mm/h", [fR(w.pr)]) : '', compass(w.wd), fV(w.ws), lbl.toLowerCase(), isFinite(w.gust) ? T("<br>Rafales {0} km/h", [fV(w.gust)]) : '']);
+      const ph = `<div class="wa"><b>${skySvg(w, 15)}<span class="wt">${fT(w.temp)}°</span><span class="ww">${fV(w.ws)}<small>${UL.kmh}</small></span></b></div>`;
+      L.marker([p.lat, p.lon], { icon: L.divIcon({ html: ph, className: '', iconSize: [110, 20], iconAnchor: [55 - dx * 46, 10 - dy * 24] }), keyboard: false }).bindTooltip(tip).addTo(layer);
+    }
+  }
+  return layer;
+}
 function drawArrowsOn(m, rg, kOff, noArrows) {
   const layer = L.layerGroup().addTo(m), map = m, windLayer = layer;
   const showA = !noArrows && $('#arrowsOn').checked, showS = noArrows || $('#skyOn').checked;
   if (!S.wx || !S.tl || !rg || (!showA && !showS)) return layer; // plusieurs tours : pas de vent sur la carte
   { const sz = map.getSize(); if (!sz.x || !sz.y) return layer; } // carte masquée (Commute : la grande carte est cachée) : getBounds donnait NaN et arrêtait tout le calcul (bug du 20/11/2026)
+  if (showA && rideLike()) return drawArrowsRide(m, rg, kOff, layer, showS);
+  if (noArrows && S.laps && S.laps.taf) return drawArrowsRide(m, rg, kOff, layer, true, true); // Commute : flèches à hampe + pastilles réparties selon la distance du trajet
   // Une flèche tous les ~40 px le long de la trace, quel que soit le zoom, et seulement dans la zone visible.
   // Entre deux points météo, la flèche prend le point le plus proche à l'heure de passage à cet endroit.
   const P = S.P, view = map.getBounds().pad(0.2), shown = [], box = badgeBox(showA, showS);
@@ -4268,9 +4328,11 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
   const P = S.P;
   c.lineJoin = c.lineCap = 'round';
   c.beginPath(); P.pts.forEach((p, i) => { const [x, y] = pt(p.lat, p.lon); i ? c.lineTo(x, y) : c.moveTo(x, y); });
-  c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 9; c.stroke();
+  const plainX = !o.rg && ridePlain();
+  if (plainX) { c.strokeStyle = 'rgba(10,20,16,.55)'; c.lineWidth = 5.5; c.stroke(); c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 3; c.stroke(); }
+  else { c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 9; c.stroke(); }
   const [sk0, sk1] = o.rg ? sampleRangeOf(o.rg) : sampleRange();
-  for (let k = sk0; k < sk1; k++) {
+  for (let k = sk0; !plainX && k < sk1; k++) {
     const a = S.samples[k].i, b = S.samples[k + 1].i, sv = S.svs ? (S.svs[k + 1] || S.svs[k]) : null;
     c.beginPath(); for (let i = a; i <= b; i++) { const [x, y] = pt(P.pts[i].lat, P.pts[i].lon); i === a ? c.moveTo(x, y) : c.lineTo(x, y); }
     c.strokeStyle = metricColor(sv); c.lineWidth = 5; c.stroke();
@@ -4279,18 +4341,30 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
   const exA = o.arrows ?? $('#arrowsOn').checked, exS = o.sky ?? $('#skyOn').checked;
   const rgx = o.rg || tripRange();
   if (S.wx && rgx && (exA || exS)) {
-    const arrow = new Path2D(WARROW), shown = [], box = badgeBox(exA, exS);
+    const arrow = new Path2D(WARROW), rarrow = new Path2D(RIDE_ARROW), shown = [], box = badgeBox(exA, exS), rideStyle = exA && rideLike();
     let run = ARROW_GAP / 2, prev = null;
+    const [ex0, ey0] = pt(P.pts[rgx[0]].lat, P.pts[rgx[0]].lon), [ex1, ey1] = pt(P.pts[rgx[0]].lat + 1 / 111.32, P.pts[rgx[0]].lon);
+    const rideMap = rideStyle ? new Map(rideMarks(rgx, Math.hypot(ex1 - ex0, ey1 - ey0)).map(mk => [mk.i, mk])) : null;
     for (let i = rgx[0]; i <= rgx[1]; i++) {
       const [x, y] = pt(P.pts[i].lat, P.pts[i].lon);
+      if (rideStyle && !rideMap.has(i)) continue;
       if (prev) run += Math.hypot(x - prev[0], y - prev[1]);
       prev = [x, y];
-      if (run < ARROW_GAP || x < x0 - 20 || y < y0 - 20 || x > x0 + W + 20 || y > y0 + H + 20) continue;
-      if (shown.some(q => badgeHit([x, y], q, box))) continue;
+      if ((!rideStyle && run < ARROW_GAP) || x < x0 - 20 || y < y0 - 20 || x > x0 + W + 20 || y > y0 + H + 20) continue;
+      if (!rideStyle && shown.some(q => badgeHit([x, y], q, box))) continue;
       const w = wxAt(sIdx(P.d[i]), S.tl.times[i]); if (!w) continue;
-      run = 0; shown.push([x, y]);
-      const sz = ringSize(w.ws), k = 22 / 24;
-      if (exA) {
+      run = 0;
+      let sz = ringSize(w.ws), k = 22 / 24, showPill = true, pdx = 0, pdy = 0;
+      if (rideStyle) {
+        sz = Math.round(arrowRideSz(w.ws)); k = sz / 24;
+        c.save(); c.shadowColor = 'rgba(0,0,0,.4)'; c.shadowBlur = 2; c.shadowOffsetY = 1;
+        c.translate(x, y); c.rotate(((w.wd + 180) % 360) * RAD); c.scale(k, k); c.translate(-12, -1.5);
+        c.lineWidth = 3.6 / k; c.lineJoin = 'round'; c.strokeStyle = '#fff'; c.fillStyle = '#fff'; c.stroke(rarrow); c.fill(rarrow); c.shadowColor = 'transparent';
+        c.fillStyle = windStrength(w.ws)[1]; c.fill(rarrow); c.lineWidth = 1.3 / k; c.strokeStyle = '#0a1410'; c.stroke(rarrow); c.restore();
+        pdx = Math.sin(((w.wd + 180) % 360) * RAD); pdy = -Math.cos(((w.wd + 180) % 360) * RAD);
+        if (!rideMap.get(i).pill) continue;
+      } else { shown.push([x, y]); }
+      if (exA && !rideStyle) {
         c.save(); c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 3; c.shadowOffsetY = 1;
         c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, sz / 2, 0, Math.PI * 2); c.fill(); c.shadowColor = 'transparent';
         c.strokeStyle = 'rgba(21,32,42,.35)'; c.lineWidth = 1.5; c.stroke();
@@ -4305,7 +4379,7 @@ async function drawMapTo(c, x0, y0, W, H, o = {}) { // o : { m: carte Leaflet, r
       c.font = fBig; const wT = c.measureText(tT).width, wW = exA ? c.measureText(tW).width : 0;
       c.font = fSmall; const wU = exA ? c.measureText(UL.kmh).width + 1 : 0;
       const sep = exA ? 7 : 0, bw = 8 + (is ? is + 2 : 0) + wT + sep + wW + wU, bh = 19;
-      const by = exA ? y + sz / 2 + 2 : y - bh / 2, bx = x - bw / 2, my = by + bh / 2;
+      const by = rideStyle ? y + pdy * 24 - bh / 2 : exA ? y + sz / 2 + 2 : y - bh / 2, bx = (rideStyle ? x + pdx * 46 : x) - bw / 2, my = by + bh / 2;
       c.fillStyle = 'rgba(255,255,255,.92)'; c.beginPath(); c.roundRect(bx, by, bw, bh, 7); c.fill();
       c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 1; c.stroke();
       let cx = bx + 4;
