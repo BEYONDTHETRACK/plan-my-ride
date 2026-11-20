@@ -1295,7 +1295,7 @@ function pRender() {
         + '<span class="meta">Ajouté par ' + 'un·e cycliste' + ' · ' + pAgo(p.created_at) + ' · ' + nR.length + ' avis</span>'
         + (p.details ? '<span class="txt">' + esc(p.details) + '</span>' : '') + '</div>'
         + (ph ? '<a href="' + esc(PHOTO + ph.photo) + '" target="_blank" rel="noopener"><img class="ph" src="' + esc(PHOTO + ph.photo) + '" alt="Photo jointe" loading="lazy"></a>' : '')
-        + pStatus(p.status, p.osm_ref) + '<div class="acts"><a class="b sm" href="' + esc(pMapLink(p.lat, p.lon, 'p:' + p.id)) + '" target="_blank" rel="noopener">Voir sur la carte</a><a class="b sm" href="https://www.openstreetmap.org/?mlat=' + p.lat + '&mlon=' + p.lon + '#map=18/' + p.lat + '/' + p.lon + '" target="_blank" rel="noopener">Voir</a>' + pActs('p', p) + '</div>' + pDupHtml(p) + '</li>'; }).join('');
+        + pStatus(p.status, p.osm_ref) + '<div class="acts"><a class="b sm" href="' + esc(pMapLink(p.lat, p.lon, 'p:' + p.id)) + '" target="_blank" rel="noopener">Voir</a><a class="b sm" href="https://www.openstreetmap.org/?mlat=' + p.lat + '&mlon=' + p.lon + '#map=18/' + p.lat + '/' + p.lon + '" target="_blank" rel="noopener">OSM</a>' + pActs('p', p) + '</div>' + pDupHtml(p) + '</li>'; }).join('');
   } else {
     const nm = r => r.poi_name || (P.pois.find(p => 'p:' + p.id === r.poi_key) || {}).name || r.poi_key;
     html = P.revs.filter(keep).map(r => '<li class="pit"><div class="main"><div class="nm">' + (r.rating ? '<span class="stars" aria-label="' + r.rating + ' sur 5">' + '★★★★★'.slice(0, r.rating) + '☆☆☆☆☆'.slice(0, 5 - r.rating) + '</span>' : '')
