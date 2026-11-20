@@ -1765,7 +1765,7 @@ window.PMR_I18N = {
     "Une vignette reste vide": "A thumbnail stays empty",
     "Zoome": "Zoom in",
     "Les points apparaissent à partir du zoom 12. Sinon : « Zoome pour voir les points ».": "Points appear from zoom level 12. Otherwise: “Zoom in to see the points”.",
-    "8 types : eau potable, boulangerie, épicerie, bivouac, abri, café · resto, atelier vélo, recharge.": "8 types: drinking water, bakery, grocery, bivouac, shelter, café · restaurant, bike workshop, charging.",
+    "11 types : eau potable, boulangerie, épicerie, bivouac, abri, café · resto, atelier vélo, toilettes, douche, défibrillateur, distributeur de billets.": "11 types: drinking water, bakery, grocery, bivouac, shelter, café · restaurant, bike workshop, toilets, shower, defibrillator, cash machine.",
     "Un seul type": "One type only",
     "Appui long (ou clic droit) sur un type. Refais-le pour tout réafficher, ou touche « Tout afficher ».": "Long-press (or right-click) a type. Do it again to show everything, or tap “Show all”.",
     "Ouvrir et filtrer": "Open and filter",
