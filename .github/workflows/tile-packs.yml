@@ -96,7 +96,8 @@ jobs:
           mkdir -p data/sources out
           # L'index Geofabrik a changé de format (Planetiler ne sait plus le lire) : on télécharge l'extrait nous-mêmes.
           reg=europe; [ "${{ matrix.area }}" = "morocco" ] && reg=africa
-          curl -fL --retry 8 --retry-delay 45 --retry-connrefused --retry-all-errors -o "data/sources/${{ matrix.area }}.osm.pbf" "https://download.geofabrik.de/$reg/${{ matrix.area }}-latest.osm.pbf"
+          curl -fL --retry 3 --retry-delay 20 --retry-connrefused --retry-all-errors -o "data/sources/${{ matrix.area }}.osm.pbf" "https://download.geofabrik.de/$reg/${{ matrix.area }}-latest.osm.pbf" \
+            || { echo "Geofabrik injoignable : miroir openstreetmap.fr"; curl -fL --retry 5 --retry-delay 30 --retry-all-errors -o "data/sources/${{ matrix.area }}.osm.pbf" "https://download.openstreetmap.fr/extracts/$reg/${{ matrix.area }}.osm.pbf"; }
           ls -lh data/sources
           java -Xmx11g -jar planetiler.jar \
             --download --osm-path="data/sources/${{ matrix.area }}.osm.pbf" \
