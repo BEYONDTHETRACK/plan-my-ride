@@ -8930,7 +8930,7 @@ async function pkBlob(p) {
   const job = (async () => {
     let rec = null; try { rec = await idbRun('pois', 'readonly', st => st.get(key)); } catch (e) {}
     if (rec && rec.built === ver && rec.blob) return rec.blob;
-    const r = await fetch(PK_URL + encodeURIComponent(p.file)); if (!r.ok) throw new Error('pack ' + r.status);
+    const r = await fetch(PK_URL + encodeURIComponent(p.file) + '&v=' + encodeURIComponent(ver)); if (!r.ok) throw new Error('pack ' + r.status); // &v = version du pack : sans elle le cache du navigateur (24 h) redonnait l'ancien fichier
     const blob = await r.blob();
     await idbRun('pois', 'readwrite', st => st.put({ key, at: Date.now(), built: ver, blob })).then(() => { (PK.stored || (PK.stored = new Set())).add(p.file); }, () => {});
     return blob;
