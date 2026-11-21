@@ -9505,6 +9505,8 @@ function pkPrep(idx) {
   idx.packs = (idx.packs || []).filter(p => Array.isArray(p.bbox));
   PK.q = idx.q || 4; PK.cell = new Map(); PK.noCells = !idx.packs.some(p => p.cells);
   for (const p of idx.packs) for (const [a, b0, b1] of (p.cells || [])) for (let b = b0; b <= b1; b++) PK.cell.set(a + ':' + b, p);
+  PK.more = new Map(); // carrés de frontière : l'autre pays y a aussi des points
+  for (const p of idx.packs) for (const [a, b0, b1] of (p.more || [])) for (let b = b0; b <= b1; b++) { const k = a + ':' + b; (PK.more.get(k) || PK.more.set(k, []).get(k)).push(p); }
   PK.idx = idx;
 }
 async function pkStored() { // packs déjà sur l'appareil
@@ -9540,6 +9542,7 @@ function pkPacksFor(s, w, n, e) {
   const out = new Set(), q = PK.q;
   for (let a = Math.floor(s * q); a <= Math.floor((n - 1e-9) * q); a++) for (let b = Math.floor(w * q); b <= Math.floor((e - 1e-9) * q); b++) {
     const p = PK.cell.get(a + ':' + b); if (p && pkAllowed(p)) out.add(p);
+    for (const p2 of (PK.more.get(a + ':' + b) || [])) if (pkAllowed(p2)) out.add(p2);
   }
   return [...out];
 }

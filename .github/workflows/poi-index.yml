@@ -48,6 +48,7 @@ jobs:
           old = {p.get("file"): p for p in json.load(open("old-index.json")).get("packs", [])}
           Q = 4  # carrés de 0,25° : à qui appartient chaque carré (le pack qui y a le plus de points)
           owner = {}  # carré -> (points, fichier)
+          allc = {}  # carré -> [(points, fichier)] : tous les packs qui y ont des points (frontières)
           packs = []
           for gz in sorted(glob.glob("*.ndjson.gz")):
               s = w = 1e9; n = e = -1e9; types = {}; total = 0; cc = None; cnt = {}
@@ -60,6 +61,7 @@ jobs:
                       k = (int(r["lat"] * Q // 1), int(r["lon"] * Q // 1)); cnt[k] = cnt.get(k, 0) + 1
               if not total: continue
               for k, v in cnt.items():
+                  allc.setdefault(k, []).append((v, gz))
                   if v > owner.get(k, (0, ""))[0]: owner[k] = (v, gz)
               o = old.get(gz, {})
               ver = hashlib.sha1(open(gz, "rb").read()).hexdigest()[:12]
@@ -69,6 +71,23 @@ jobs:
           # cellules de chaque pack en plages [lat, lon début, lon fin] (unités de 0,25°)
           mine = {}
           for (a, b), (v, gz) in owner.items(): mine.setdefault(gz, {}).setdefault(a, []).append(b)
+          # carrés de frontière : un second pack (l'autre pays) y a au moins 3 points et 5 % des points du carré
+          more = {}
+          for k, lst in allc.items():
+              tot = sum(v for v, _ in lst)
+              for v, gz in lst:
+                  if gz != owner[k][1] and v >= 3 and v >= 0.05 * tot: more.setdefault(gz, {}).setdefault(k[0], []).append(k[1])
+          def runsOf(d):
+              runs = []
+              for a, bs in sorted(d.items()):
+                  bs.sort(); b0 = prev = bs[0]
+                  for b in bs[1:] + [None]:
+                      if b is not None and b == prev + 1: prev = b; continue
+                      runs.append([a, b0, prev])
+                      if b is not None: b0 = prev = b
+              return runs
+          for p in packs:
+              p["more"] = runsOf(more.get(p["file"], {}))
           for p in packs:
               runs = []
               for a, bs in sorted(mine.get(p["file"], {}).items()):
