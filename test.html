@@ -4090,6 +4090,60 @@ try { if (!localStorage.getItem('pmr-sgl-def2')) { localStorage.setItem('pmr-sgl
 const SGL_JS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const SGL_CSS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css';
 let sglP = null;
+// ===== Carte hors ligne d'une trace : couloir de tuiles (calcul pur, sans réseau) =====
+// Couloir dégressif : plus on zoome, plus il est étroit (rayons en km autour de la trace).
+const OC_RADII = [[11, 15], [12, 10], [13, 4], [14, 1.5]]; // [zoom maxi, rayon] ; zooms 0–11 : 15 km
+const OC_MAXZ = 14;
+// Poids moyen d'une tuile vectorielle / de relief, en Ko, par zoom (À CALIBRER sur les packs R2 : LU = 36 Mo pour 1 932 tuiles).
+const OC_KB = { vec: { 0: 20, 11: 28, 12: 26, 13: 22, 14: 18 }, dem: 30 };
+function ocRadius(z) { for (const [zm, r] of OC_RADII) if (z <= zm) return r; return 0; }
+function ocTileXY(lat, lon, z) {
+  const n = 2 ** z, la = Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180;
+  return [(lon + 180) / 360 * n, (1 - Math.log(Math.tan(la) + 1 / Math.cos(la)) / Math.PI) / 2 * n];
+}
+function ocTileLat(y, z) { const n = Math.PI - 2 * Math.PI * y / 2 ** z; return 180 / Math.PI * Math.atan(Math.sinh(n)); }
+// Tuiles (clés « z/x/y ») à moins de `rKm` d'un point de la trace (distance au rectangle de la tuile, pas au centre).
+function ocCorridor(pts, z, rKm) {
+  const out = new Set(), n = 2 ** z, step = Math.max(0.2, rKm / 3), slack = step / 2 + 0.05;
+  const R = rKm + slack, kLat = 111.32;
+  let carry = 0, prev = null;
+  const visit = (lat, lon) => {
+    const kLon = kLat * Math.cos(lat * Math.PI / 180), dLat = R / kLat, dLon = R / Math.max(kLon, 1e-6);
+    const [x0, y1] = ocTileXY(lat - dLat, lon - dLon, z), [x1, y0] = ocTileXY(lat + dLat, lon + dLon, z);
+    for (let x = Math.floor(x0); x <= Math.floor(x1); x++) for (let y = Math.floor(y0); y <= Math.floor(y1); y++) {
+      if (y < 0 || y >= n) continue;
+      const xm = ((x % n) + n) % n, key = z + '/' + xm + '/' + y;
+      if (out.has(key)) continue;
+      const w = x / n * 360 - 180, e = (x + 1) / n * 360 - 180, nn = ocTileLat(y, z), s = ocTileLat(y + 1, z);
+      const cl = Math.max(s, Math.min(nn, lat)), co = Math.max(w, Math.min(e, lon));
+      const dy = (cl - lat) * kLat, dx = (co - lon) * kLon;
+      if (dx * dx + dy * dy <= R * R) out.add(key);
+    }
+  };
+  for (const p of pts) {
+    if (prev) {
+      const dk = Math.hypot((p.lat - prev.lat) * kLat, (p.lon - prev.lon) * kLat * Math.cos(p.lat * Math.PI / 180));
+      let t = step - carry;
+      while (t < dk) { const f = t / dk; visit(prev.lat + (p.lat - prev.lat) * f, prev.lon + (p.lon - prev.lon) * f); t += step; }
+      carry = (carry + dk) % step;
+    } else visit(p.lat, p.lon);
+    prev = p;
+  }
+  if (prev) visit(prev.lat, prev.lon);
+  return out;
+}
+// Toutes les tuiles du couloir dégressif : { vec: [clés], dem: [clés ≤ zoom 11], est: octets estimés }.
+function ocPlan(pts) {
+  const vec = [], dem = [];
+  for (let z = 0; z <= OC_MAXZ; z++) {
+    const set = ocCorridor(pts, z, z < 4 ? 20000 : ocRadius(z));
+    for (const k of set) { vec.push(k); if (z <= 11) dem.push(k); }
+  }
+  let est = dem.length * OC_KB.dem * 1024;
+  for (const k of vec) { const z = +k.split('/')[0]; est += (OC_KB.vec[z] ?? (z < 11 ? OC_KB.vec[0] : OC_KB.vec[14])) * 1024; }
+  return { vec, dem, est };
+}
+
 function sglLoad() {
   if (sglP) return sglP;
   if (!document.querySelector('link[data-sgl]')) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = SGL_CSS; l.dataset.sgl = '1'; document.head.appendChild(l); }
