@@ -1,0 +1,197 @@
+# Tuiles vectorielles par pays pour la carte hors ligne de Sillage (même schéma OpenMapTiles
+# que OpenFreeMap : le style « Sillage » ne change pas).
+# Pour chaque pays : extrait Geofabrik → Planetiler (profil OpenMapTiles) → <cc>.pmtiles (zoom 0 à 14)
+# → dépôt sur Cloudflare R2 (tiles/<cc>.pmtiles), lu par morceaux (HTTP Range) par l'appli.
+# Polices (Noto Sans Regular / Bold / Italic) : tâche « fonts », déposées dans fonts/ du même bucket.
+# Lancement à la main seulement (gros calculs). Données © OpenStreetMap contributors (ODbL).
+#
+# Secrets GitHub à créer (Settings → Secrets and variables → Actions) :
+#   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+name: Tuiles hors ligne (pays)
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Codes pays séparés par des virgules (vide = tous)"
+        required: false
+        default: ""
+      fonts:
+        description: "Déposer aussi les polices"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tile-packs
+  cancel-in-progress: false
+
+jobs:
+  tiles:
+    name: ${{ matrix.cc }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          # Espace économique européen
+          - { cc: AT, area: austria }
+          - { cc: BE, area: belgium }
+          - { cc: BG, area: bulgaria }
+          - { cc: HR, area: croatia }
+          - { cc: CY, area: cyprus }
+          - { cc: CZ, area: czech-republic }
+          - { cc: DK, area: denmark }
+          - { cc: EE, area: estonia }
+          - { cc: FI, area: finland }
+          - { cc: FR, area: france }
+          - { cc: DE, area: germany }
+          - { cc: GR, area: greece }
+          - { cc: HU, area: hungary }
+          - { cc: IS, area: iceland }
+          - { cc: IE, area: ireland-and-northern-ireland }
+          - { cc: IT, area: italy }
+          - { cc: LV, area: latvia }
+          - { cc: LI, area: liechtenstein }
+          - { cc: LT, area: lithuania }
+          - { cc: LU, area: luxembourg }
+          - { cc: MT, area: malta }
+          - { cc: NL, area: netherlands }
+          - { cc: NO, area: norway }
+          - { cc: PL, area: poland }
+          - { cc: PT, area: portugal }
+          - { cc: PT-AZ, area: azores }
+          - { cc: RO, area: romania }
+          - { cc: SK, area: slovakia }
+          - { cc: SI, area: slovenia }
+          - { cc: ES, area: spain }
+          - { cc: SE, area: sweden }
+          # Hors EEE
+          - { cc: MA, area: morocco }
+    steps:
+      - name: Pays demandé ?
+        id: want
+        run: |
+          only="${{ github.event.inputs.only }}"
+          if [ -z "$only" ] || echo ",$only," | tr -d ' ' | grep -qi ",${{ matrix.cc }},"; then echo "go=1" >> "$GITHUB_OUTPUT"; else echo "go=0" >> "$GITHUB_OUTPUT"; fi
+      - name: Libérer de la place disque
+        if: steps.want.outputs.go == '1'
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL || true
+          df -h / | tail -1
+      - uses: actions/setup-java@v4
+        if: steps.want.outputs.go == '1'
+        with: { distribution: temurin, java-version: "21" }
+      - name: Planetiler
+        if: steps.want.outputs.go == '1'
+        run: curl -fsSL --retry 5 --retry-delay 20 -o planetiler.jar https://github.com/onthegomap/planetiler/releases/latest/download/planetiler.jar && ls -lh planetiler.jar
+      - name: Fabrication des tuiles
+        if: steps.want.outputs.go == '1'
+        run: |
+          sudo mkdir -p /mnt/tmp && sudo chown "$USER" /mnt/tmp
+          mkdir -p data out
+          java -Xmx11g -jar planetiler.jar \
+            --download --area="${{ matrix.area }}" \
+            --output="out/${{ matrix.cc }}.pmtiles" \
+            --storage=mmap --force \
+            --maxzoom=14 \
+            --tmpdir=/mnt/tmp --download_dir=data/sources 2>&1 | tail -n 60
+          ls -lh out
+      - name: Fiche du pack
+        if: steps.want.outputs.go == '1'
+        run: |
+          python3 - <<'EOF'
+          import json, os, struct, datetime
+          cc = "${{ matrix.cc }}"; f = f"out/{cc}.pmtiles"
+          h = open(f, "rb").read(127)
+          assert h[:7] == b"PMTiles", "pas un PMTiles"
+          minz, maxz = h[100], h[101]
+          w, s, e, n = [v / 1e7 for v in struct.unpack_from("<iiii", h, 102)]
+          tiles = struct.unpack_from("<Q", h, 72)[0]
+          info = {"cc": cc, "area": "${{ matrix.area }}", "file": f"tiles/{cc}.pmtiles", "bytes": os.path.getsize(f),
+                  "bbox": [s, w, n, e], "minzoom": minz, "maxzoom": maxz, "tiles": tiles,
+                  "built": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ")}
+          json.dump(info, open(f"out/{cc}.json", "w"))
+          print(info)
+          EOF
+      - name: Dépôt sur R2
+        if: steps.want.outputs.go == '1'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          EP: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          aws s3 cp "out/${{ matrix.cc }}.pmtiles" "s3://$BUCKET/tiles/${{ matrix.cc }}.pmtiles" --endpoint-url "$EP" --content-type application/octet-stream --only-show-errors
+          aws s3 cp "out/${{ matrix.cc }}.json" "s3://$BUCKET/tiles/${{ matrix.cc }}.json" --endpoint-url "$EP" --content-type application/json --only-show-errors
+      - uses: actions/upload-artifact@v4
+        if: steps.want.outputs.go == '1'
+        with:
+          name: tile-${{ matrix.cc }}
+          path: out/*.json
+          retention-days: 30
+
+  index:
+    name: Index des tuiles
+    needs: tiles
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: fiches, pattern: tile-*, merge-multiple: true }
+      - name: Index fusionné avec celui déjà publié
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          EP: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          aws s3 cp "s3://$BUCKET/tiles/index.json" old.json --endpoint-url "$EP" --only-show-errors || echo '{"packs":[]}' > old.json
+          python3 - <<'EOF'
+          import json, glob, datetime
+          old = {p["cc"]: p for p in json.load(open("old.json")).get("packs", [])}
+          for f in glob.glob("fiches/*.json"):
+              p = json.load(open(f)); old[p["cc"]] = p
+          packs = sorted(old.values(), key=lambda p: p["cc"])
+          idx = {"built": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"),
+                 "source": "OpenStreetMap (ODbL), schéma OpenMapTiles, Planetiler", "packs": packs}
+          json.dump(idx, open("index.json", "w"), ensure_ascii=False, indent=1)
+          print(len(packs), "pays,", round(sum(p["bytes"] for p in packs) / 1e9, 2), "Go")
+          EOF
+          aws s3 cp index.json "s3://$BUCKET/tiles/index.json" --endpoint-url "$EP" --content-type application/json --cache-control "max-age=300" --only-show-errors
+
+  fonts:
+    name: Polices
+    if: github.event.inputs.fonts != 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Polices Noto Sans (openmaptiles/fonts)
+        run: |
+          curl -fsSL --retry 5 -o fonts.zip https://github.com/openmaptiles/fonts/releases/download/v2.0/v2.0.zip
+          mkdir f && unzip -q fonts.zip -d f
+          mkdir out
+          for n in "Noto Sans Regular" "Noto Sans Bold" "Noto Sans Italic"; do
+            src=$(find f -type d -name "$n" | head -1); test -n "$src" || { echo "police introuvable : $n"; exit 1; }
+            cp -r "$src" "out/$n"
+          done
+          find out -name '*.pbf' | wc -l
+      - name: Dépôt sur R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          EP: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          BUCKET: ${{ secrets.R2_BUCKET }}
+        run: aws s3 sync out "s3://$BUCKET/fonts" --endpoint-url "$EP" --content-type application/x-protobuf --only-show-errors
