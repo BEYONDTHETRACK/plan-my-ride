@@ -9383,6 +9383,7 @@ const PM_TYPES = {
 // Noms courts de la ligne d'icônes (téléphone) ; en anglais, mots plus courts que les noms longs traduits
 const PM_SHORT_EN = { fontaine: 'Water', boulangerie: 'Bakery', epicerie: 'Shop', bivouac: 'Camp', abri: 'Shelter', cafe: 'Café', atelier: 'Repair', wc: 'WC', douche: 'Shower', defibrillateur: 'AED', atm: 'ATM' };
 if (LANG === 'en') for (const k in PM_SHORT_EN) if (PM_TYPES[k]) PM_TYPES[k].s = PM_SHORT_EN[k];
+const PM_NEWT = new Set(['wc', 'douche', 'defibrillateur', 'atm']); // types absents de la base osm_poi (21/11/2026) : lus dans les packs même là où la base couvre
 const PM_TILE = 0.1, PM_MINZ = 12, PM_TTL = 7 * 864e5, PM_MAX_OSM = 450;
 const PM_PHOTO = SB_URL + '/storage/v1/object/public/poi-photos/';
 const PM = { ver: new Map(), map: null, layer: null, route: null, routeSig: null, me: null, tiles: new Map(), busy: new Set(), queue: [], running: 0, failed: 0,
@@ -9754,11 +9755,12 @@ async function pmLoadOsm() {
   PM.queue = PM.queue.filter(k => keys.includes(k)); // on oublie les carrés qui ne sont plus à l'écran
   await pmCoverage();
   if (PK_ON) await pkIndex();
-  const pkKeys = [];
+  const pkKeys = [], xKeys = [];
   for (const k of keys) {
     if (PM.tiles.has(k) || PM.busy.has(k) || PM.queue.includes(k)) continue;
     if (PK_ON && !pmCovered(k) && pkTileHas(k)) { pkKeys.push(k); PM.busy.add(k); continue; } // pack du pays
     if (pmCovered(k)) { // base Sillage : lecture directe, sans passer par Overpass
+      if (PK_ON && pkTileHas(k)) xKeys.push(k); // les types arrivés après l'import de la base (toilettes, douches…) viennent du pack du pays
       PM.busy.add(k); PM.running++; pmStatus();
       pmFromBase(k).then(items => { PM.tiles.set(k, true); PM.failed = 0; pmAddItems(items); })
         .catch(() => { PM.cov = []; PM.queue.push(k); }) // base injoignable : Overpass
@@ -9776,6 +9778,9 @@ async function pmLoadOsm() {
     pkTiles(pkKeys).then(got => { for (const [k, rows] of got) { PM.tiles.set(k, true); pmAddItems(pkPm(rows)); } PM.failed = 0; })
       .catch(() => { PM.queue.push(...pkKeys.filter(k => !PM.tiles.has(k))); }) // pack injoignable : Overpass
       .finally(() => { pkKeys.forEach(k => PM.busy.delete(k)); PM.running--; pmRender(); pmPump(); });
+  }
+  if (xKeys.length) { // carrés lus dans la base : on ajoute seulement les types que la base n'a pas
+    pkTiles(xKeys).then(got => { for (const [, rows] of got) pmAddItems(pkPm(rows.filter(r => PM_NEWT.has(r.type)))); }).catch(() => {}).finally(pmRender);
   }
   pmRender(); pmPump();
 }
