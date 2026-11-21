@@ -405,6 +405,12 @@ html[data-motion="reduce"] dialog.kind-dlg{animation:none}
 /* Ultra : pays traversés et packs de points hors ligne (12/11/2026) */
 .pk-kick{font:600 11px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:2px 44px 6px 0}
 .pk-dlg h2{margin:0 0 6px}
+.off-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.off-act .btn.small{min-height:36px;padding:0 12px}
+.off-act .btn.small.arm{background:var(--head);border-color:var(--head);color:#fff}
+.off-add{display:flex;gap:8px;align-items:center;margin-top:12px}
+.off-add select{flex:1;min-width:0}
+.off-upd{font-size:12px;font-weight:600;color:color-mix(in srgb,var(--sun) 60%,var(--ink))}
 .pk-rows{margin:12px 0 10px;border-top:1px solid var(--line)}
 .pk-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
 .pk-cc{font:600 12px var(--f-mono);min-width:34px;height:26px;border-radius:7px;display:grid;place-items:center;background:color-mix(in srgb,var(--ink) 6%,var(--panel))}
@@ -2007,6 +2013,13 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
       </details>
       <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
     </div></div>
+  <div class="me-card no-guest" id="meOffCard"><h3>Cartes hors ligne</h3>
+    <p class="hint">Les points utiles (eau, ravitos, hébergements…) et les villes, gardés sur ton téléphone pays par pays : la Carte et Ultra marchent alors sans réseau.</p>
+    <p class="hint" id="meOffSum"></p>
+    <div class="pk-rows" id="meOffRows"></div>
+    <div class="off-add" id="meOffAdd"><select id="meOffSel" class="me-sel" aria-label="Pays à ajouter"></select><button type="button" class="btn small primary" id="meOffGo">Télécharger</button></div>
+    <p class="me-btns"><button type="button" class="linkbtn" id="meOffAll" hidden>Tout supprimer</button></p>
+    <p class="hint al-msg" id="meOffMsg" aria-live="polite"></p></div>
   <p class="me-gl">Affichage</p>
   <div class="me-list">
     <details class="me-li" id="meLiTheme"><summary><span class="me-lt"><b>Thème</b></span><span class="me-lv" id="meVTheme"></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary><div class="me-lb"><div class="seg2 me-theme" id="meTheme" role="group" aria-label="Thème"><button type="button" data-t="light">Clair</button><button type="button" data-t="auto">Automatique</button><button type="button" data-t="dark">Sombre</button></div></div></details>
@@ -9071,7 +9084,7 @@ function meRender() {
   $('#meVMotion').textContent = seg('meMotion'); $('#meVFont').textContent = seg('meFont').replace(/\s*\(.*\)/, '');
   meTafSel();
 }
-function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); }
+function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); }
 const ME_STEP = { speed: [12, 40, 0.5], vam: [300, 1400, 50], pmin: [0, 30, 1] };
 function meModesRender() {
   const m = ME.mode, g = meGet(m), fmt = { speed: v => fV(+v, 1) + ' ' + UL.kmh, vam: v => fE(+v) + ' ' + UL.mh, pmin: v => v + ' min' };
@@ -9694,6 +9707,61 @@ async function pkDownload() {
 $('#pkGo').addEventListener('click', pkDownload);
 $('#pkLater').addEventListener('click', () => { $('#pkDlg').close(); $('#pkLater').hidden = false; });
 $('#pkX').addEventListener('click', () => { $('#pkDlg').close(); $('#pkLater').hidden = false; });
+
+/* Cartes hors ligne (page Moi, 21/11/2026, test.html) : liste des packs de points déjà sur l'appareil (pays, taille, date,
+   « mise à jour disponible » quand la version de l'index a changé), mise à jour, suppression (deux appuis), « Tout supprimer »,
+   et téléchargement d'un pays choisi dans la liste sans passer par une trace. Mêmes fonctions que le panneau d'Ultra (pkBlob). */
+async function pkStoredInfo() {
+  const m = new Map();
+  try { const rs = await idbRun('pois', 'readonly', o => o.getAll(IDBKeyRange.bound('pk1|', 'pk1|\uffff'))); for (const r of rs || []) m.set(String(r.key).slice(4), { bytes: r.blob ? r.blob.size : 0, built: r.built, at: r.at }); } catch (e) {}
+  return m;
+}
+const pkVer = p => p.ver || (PK.idx.built + '|' + p.bytes);
+function offChanged() { PK.done.clear(); PK.tiles.clear(); try { if (typeof pmLoadOsm === 'function') pmLoadOsm(); } catch (e) {} }
+function offMsg(t, err) { const m = $('#meOffMsg'); if (m) { m.textContent = t || ''; m.classList.toggle('err', !!err); } }
+async function offRender() {
+  const box = $('#meOffRows'); if (!box || !PK_ON) return;
+  await pkIndex(); const info = await pkStoredInfo(), byFile = new Map((PK.idx.packs || []).map(p => [p.file, p]));
+  const have = [...info.entries()].map(([f, i]) => { const p = byFile.get(f); return { f, p, i, upd: !!(p && i.built !== pkVer(p)), name: p ? pkCcName(p) : f.replace(/\.ndjson\.gz$/, '') }; })
+    .sort((a, b) => a.name.localeCompare(b.name, LANG));
+  const tot = have.reduce((s, h) => s + (h.i.bytes || 0), 0);
+  $('#meOffSum').textContent = have.length ? T("{0} sur ton téléphone · {1}", [have.length > 1 ? T("{0} pays", [have.length]) : T("1 pays"), pkMo(tot)]) : T("Aucun pays sur ton téléphone pour l'instant.");
+  box.innerHTML = have.map(h => `<div class="pk-row have off-row" data-f="${escH(h.f)}"><span class="pk-cc">${escH(h.p && (h.p.cc || '').slice(0, 2) || '·')}</span>`
+    + `<span class="pk-nm">${escH(h.name)}<small>${escH(pkMo(h.i.bytes || (h.p ? h.p.bytes : 0)))}${h.i.at ? ' · ' + escH(new Date(h.i.at).toLocaleDateString(LOC, { day: 'numeric', month: 'short' })) : ''}${h.upd ? ' · <span class="off-upd">' + escH(T("Mise à jour disponible")) + '</span>' : ''}</small></span>`
+    + `<span class="off-act">${h.upd ? `<button type="button" class="btn small" data-act="upd">${escH(T("Mettre à jour"))}</button>` : ''}<button type="button" class="btn small" data-act="del">${escH(T("Supprimer"))}</button></span></div>`).join('');
+  const rest = (PK.idx.packs || []).filter(p => !info.has(p.file)).map(p => ({ p, name: pkCcName(p) })).sort((a, b) => a.name.localeCompare(b.name, LANG));
+  const lim = PK_LIM() && have.length >= 1;
+  $('#meOffAdd').hidden = !rest.length || lim;
+  $('#meOffSel').innerHTML = `<option value="">${escH(T("Ajouter un pays…"))}</option>` + rest.map(r => `<option value="${escH(r.p.file)}">${escH(r.name)} · ${escH(pkMo(r.p.bytes))}</option>`).join('');
+  $('#meOffAll').hidden = have.length < 2;
+  if (!PK.idx.packs.length && !have.length) offMsg(T("Liste des pays indisponible : vérifie ta connexion."), true);
+  else if (lim) offMsg(T("Compte gratuit : un seul pays hors ligne. Sillage.cc + les garde tous."));
+}
+async function offGet(files, btn) {
+  const wifi = (() => { try { return localStorage.getItem('pmr-pk-wifi') !== '0'; } catch (e) { return true; } })(), cn = navigator.connection;
+  if (wifi && cn && cn.type === 'cellular') { offMsg(T("Tu es en données mobiles. Décoche « Seulement en Wi-Fi » ou réessaie en Wi-Fi."), true); return; }
+  if (btn) btn.disabled = true; offMsg(''); let fail = [];
+  for (const f of files) {
+    const p = (PK.idx.packs || []).find(x => x.file === f); if (!p) continue;
+    offMsg(T("Téléchargement · {0}…", [pkCcName(p)])); PK.blobs.delete(f);
+    try { await pkBlob(p); } catch (e) { fail.push(pkCcName(p)); }
+  }
+  if (btn) btn.disabled = false;
+  offMsg(fail.length ? T("Téléchargement impossible pour {0}. Réessaie plus tard.", [fail.join(', ')]) : T("C'est prêt."), !!fail.length);
+  offChanged(); await offRender();
+}
+async function offDel(files) {
+  for (const f of files) { try { await idbRun('pois', 'readwrite', o => o.delete('pk1|' + f)); } catch (e) {} if (PK.stored) PK.stored.delete(f); PK.blobs.delete(f); }
+  offMsg(T("Supprimé.")); offChanged(); await offRender();
+}
+const offArm = (b, fn) => { if (b.dataset.arm) { clearTimeout(+b.dataset.arm); fn(); return; } const old = b.textContent; b.classList.add('arm'); b.textContent = T("Confirmer ?"); b.dataset.arm = setTimeout(() => { b.classList.remove('arm'); b.textContent = old; delete b.dataset.arm; }, 4000); };
+$('#meOffRows').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'), row = e.target.closest('.off-row'); if (!b || !row) return;
+  const f = row.dataset.f;
+  if (b.dataset.act === 'upd') offGet([f], b); else offArm(b, () => offDel([f]));
+});
+$('#meOffGo').addEventListener('click', e => { const f = $('#meOffSel').value; if (f) offGet([f], e.currentTarget); });
+$('#meOffAll').addEventListener('click', e => offArm(e.currentTarget, async () => { const info = await pkStoredInfo(); offDel([...info.keys()]); }));
 const pkPm = rows => rows.filter(r => PM_TYPES[r.type]).map(r => ({ src: 'osm', ref: r.id, type: r.type, name: r.name || '', lat: r.lat, lon: r.lon, tags: { ...(r.t || {}), ...(r.name ? { name: r.name } : {}) } }));
 // Page Ultra : portions dont tous les carrés sont couverts par un pack (même logique que poiFromBase).
 /* Villes des graphes du jour lues dans les packs déjà sur l'appareil (19/11/2026) : marche hors ligne.

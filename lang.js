@@ -1992,6 +1992,22 @@ window.PMR_I18N = {
     "Les pays téléchargés restent sur ton téléphone, même sans réseau.": "Downloaded countries stay on your phone, even without a signal.",
     "Dossier des parcours": "Route folder",
     "Aucun parcours dans ce dossier": "No routes in this folder",
-    "Choisis un parcours…": "Choose a route…"
+    "Choisis un parcours…": "Choose a route…",
+    "Cartes hors ligne": "Offline maps",
+    "Les points utiles (eau, ravitos, hébergements…) et les villes, gardés sur ton téléphone pays par pays : la Carte et Ultra marchent alors sans réseau.": "Useful points (water, supplies, places to sleep…) and towns, kept on your phone country by country: the Map and Ultra then work without a connection.",
+    "Pays à ajouter": "Country to add",
+    "Tout supprimer": "Delete all",
+    "{0} sur ton téléphone · {1}": "{0} on your phone · {1}",
+    "{0} pays": "{0} countries",
+    "1 pays": "1 country",
+    "Aucun pays sur ton téléphone pour l'instant.": "No country on your phone yet.",
+    "Mise à jour disponible": "Update available",
+    "Mettre à jour": "Update",
+    "Ajouter un pays…": "Add a country…",
+    "Liste des pays indisponible : vérifie ta connexion.": "Country list unavailable: check your connection.",
+    "Compte gratuit : un seul pays hors ligne. Sillage.cc + les garde tous.": "Free account: one offline country only. Sillage.cc + keeps them all.",
+    "Téléchargement · {0}…": "Downloading · {0}…",
+    "C'est prêt.": "All set.",
+    "Supprimé.": "Deleted."
   }
 };
