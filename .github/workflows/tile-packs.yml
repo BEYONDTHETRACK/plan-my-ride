@@ -93,9 +93,13 @@ jobs:
         if: steps.want.outputs.go == '1'
         run: |
           sudo mkdir -p /mnt/tmp && sudo chown "$USER" /mnt/tmp
-          mkdir -p data out
+          mkdir -p data/sources out
+          # L'index Geofabrik a changé de format (Planetiler ne sait plus le lire) : on télécharge l'extrait nous-mêmes.
+          reg=europe; [ "${{ matrix.area }}" = "morocco" ] && reg=africa
+          curl -fL --retry 5 --retry-delay 30 -o "data/sources/${{ matrix.area }}.osm.pbf" "https://download.geofabrik.de/$reg/${{ matrix.area }}-latest.osm.pbf"
+          ls -lh data/sources
           java -Xmx11g -jar planetiler.jar \
-            --download --area="${{ matrix.area }}" \
+            --download --osm-path="data/sources/${{ matrix.area }}.osm.pbf" \
             --output="out/${{ matrix.cc }}.pmtiles" \
             --storage=mmap --force \
             --maxzoom=14 \
