@@ -170,7 +170,23 @@
 
   // ---- Lien d'alerte ou lien testeur ouvert dans l'app -----------------------
   // https://…/index.html?route=…&date=…&time=… ou ?invite=CODE → même page, mêmes paramètres.
+  // Fichier GPX ouvert avec Sillage depuis une autre appli (Partager → Sillage, « Ouvrir avec ») : lu puis passé à l'import.
+  function openGpx(url) {
+    if (!P.Filesystem) return;
+    P.Filesystem.readFile({ path: url, encoding: 'utf8' }).then(function (r) {
+      var txt = typeof r.data === 'string' ? r.data : '', name = decodeURIComponent((url.split('?')[0].split('/').pop() || 'trace.gpx'));
+      if (!/\.gpx/i.test(name)) name += '.gpx';
+      var tries = 0, t = setInterval(function () {
+        tries++;
+        if (typeof window.handleFile === 'function' && !document.body.classList.contains('gated')) {
+          clearInterval(t);
+          window.handleFile(new File([txt], name, { type: 'application/gpx+xml' }));
+        } else if (tries > 80) clearInterval(t);
+      }, 250);
+    }).catch(function () {});
+  }
   if (P.App) P.App.addListener('appUrlOpen', function (ev) {
+    if (/^(file|content):/i.test(ev.url || '')) { openGpx(ev.url); return; }
     try {
       var u = new URL(ev.url), q = u.search;
       if (q && q !== location.search) location.replace(location.pathname + q + (u.hash || ''));
