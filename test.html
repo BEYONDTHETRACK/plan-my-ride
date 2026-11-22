@@ -4218,7 +4218,7 @@ let OC_DB = null;
 function ocDb() {
   return OC_DB || (OC_DB = new Promise((res, rej) => {
     const q = indexedDB.open('sillage-offline', 1);
-    q.onupgradeneeded = () => { const d = q.result; d.createObjectStore('tiles', { keyPath: 'k' }); d.createObjectStore('traces', { keyPath: 'id' }); };
+    q.onupgradeneeded = () => { const d = q.result; d.createObjectStore('tiles', { keyPath: 'k' }); d.createObjectStore('traces', { keyPath: 'id' }); d.createObjectStore('assets', { keyPath: 'k' }); };
     q.onsuccess = () => res(q.result); q.onerror = () => { OC_DB = null; rej(q.error); };
   }));
 }
@@ -4301,10 +4301,49 @@ async function ocDownload(id, pts, opts = {}) {
   await ocTraceSave(m); return m;
 }
 
+
+// ----- Protocoles MapLibre : tuiles vectorielles et polices lues d'abord sur l'appareil, puis sur le réseau -----
+async function ocAssetGet(k) { const r = await ocReq((await ocDb()).transaction('assets').objectStore('assets').get(k)); return r ? r.d : null; }
+async function ocAssetPut(k, d) { const tx = (await ocDb()).transaction('assets', 'readwrite'); tx.objectStore('assets').put({ k, d }); await new Promise(r => { tx.oncomplete = r; tx.onerror = r; }); }
+const OC_GLYPH_RANGES = ['0-255', '256-511', '512-767', '768-1023', '1024-1279', '1280-1535', '1536-1791', '1792-2047', '8192-8447'];
+const OC_FONTS = ['Noto Sans Regular', 'Noto Sans Bold', 'Noto Sans Italic'];
+async function ocGlyph(stack, range, signal, store) {
+  const k = 'g|' + stack + '|' + range; let d = null;
+  try { d = await ocAssetGet(k); } catch (_) {}
+  if (d) return d;
+  for (const u of [OC_R2 + '/fonts/' + encodeURIComponent(stack) + '/' + range + '.pbf', 'https://tiles.openfreemap.org/fonts/' + encodeURIComponent(stack) + '/' + range + '.pbf']) {
+    try { const r = await fetch(u, { signal }); if (r.ok) { d = await r.arrayBuffer(); break; } } catch (e) { if (signal && signal.aborted) throw e; }
+  }
+  if (!d) return null;
+  try { await ocAssetPut(k, d); } catch (_) {}
+  return d;
+}
+let OC_PROTO = false;
+function ocProtocols() {
+  if (OC_PROTO || !window.maplibregl) return; OC_PROTO = true;
+  maplibregl.addProtocol('sglo', async (p, ac) => {       // sglo://z/x/y : tuile vectorielle
+    const [z, x, y] = p.url.slice(7).split('/').map(Number);
+    try { const d = await ocTileGet(z, x, y); if (d) return { data: d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) }; } catch (_) {}
+    if (navigator.onLine === false) return { data: new ArrayBuffer(0) };      // hors ligne, hors couloir : tuile vide, sans erreur
+    try {
+      const tpl = await plTpl(), r = await fetch(tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal: ac.signal });
+      if (r.status === 404 || r.status === 204) return { data: new ArrayBuffer(0) };
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return { data: await r.arrayBuffer() };
+    } catch (e) { if (ac.signal.aborted) throw e; return { data: new ArrayBuffer(0) }; }
+  });
+  maplibregl.addProtocol('sglg', async (p, ac) => {       // sglg://<police>/<plage>.pbf : polices
+    const m = /^sglg:\/\/(.+)\/([^/]+)\.pbf$/.exec(p.url); if (!m) throw new Error('police ?');
+    const d = await ocGlyph(decodeURIComponent(m[1]), m[2], ac.signal);
+    if (!d) throw new Error('police indisponible');
+    return { data: d };
+  });
+}
+
 function sglLoad() {
   if (sglP) return sglP;
   if (!document.querySelector('link[data-sgl]')) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = SGL_CSS; l.dataset.sgl = '1'; document.head.appendChild(l); }
-  return (sglP = loadScript(SGL_JS).then(() => !!window.maplibregl).catch(() => { sglP = null; return false; }));
+  return (sglP = loadScript(SGL_JS).then(() => { if (window.maplibregl) ocProtocols(); return !!window.maplibregl; }).catch(() => { sglP = null; return false; }));
 }
 const SGL_PAL = {
   light: { bg: '#EEF0EA', forest: '#D3E1CC', grass: '#E2EADB', farm: '#ECEEE4', urban: '#E6E3DD', rock: '#E4E2DC', water: '#B9D3E6', waterLine: '#8FB6D4', waterLabel: '#3E6E94', build: '#DCD8D1', minor: '#FFFFFF', minorCase: '#D3D6CF', major: '#FFF3D6', majorCase: '#E0C88E', hwy: '#F6D58A', hwyCase: '#C9A24A', path: '#2E7D4F', cyc: '#178A4E', cycCase: '#FFFFFF', dirt: '#A47A45', ink: '#14201B', ink2: '#4C5852', halo: '#F6F7F3', border: '#9A7FB0', shade: '#14201B', hl: '#FFFFFF', ex: 0.3 },
@@ -4318,9 +4357,9 @@ function sglStyle(p) {
   const CYC = ['all', cls(['path', 'track']), ['any', ['==', ['get', 'subclass'], 'cycleway'], ['==', ['get', 'bicycle'], 'designated']]];
   const road = (id, c, w, filt, mz) => Object.assign({ id, type: 'line', source: 'om', 'source-layer': 'transportation', filter: filt, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': c, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom']].concat(w) } }, mz ? { minzoom: mz } : {});
   return {
-    version: 8, glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    version: 8, glyphs: 'sglg://{fontstack}/{range}.pbf',
     sources: {
-      om: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
+      om: { type: 'vector', tiles: ['sglo://{z}/{x}/{y}'], minzoom: 0, maxzoom: 14 },
       dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 13 }
     },
     layers: [
