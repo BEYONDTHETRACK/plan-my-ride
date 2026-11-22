@@ -9821,7 +9821,13 @@ async function pkIndex() {
     const r = await fetch(PK_URL + 'index.json'); if (!r.ok) throw new Error('index ' + r.status);
     const idx = await r.json(); pkPrep(idx); PK.at = Date.now();
     idbRun('pois', 'readwrite', o => o.put({ key: 'pkidx1', at: PK.at, idx })).catch(() => {});
-  } catch (e) { if (!PK.idx) pkPrep({ packs: [] }); PK.at = Date.now() - 25 * 60e3; } // nouvel essai dans 5 min
+  } catch (e) {
+    if (!PK.idx) { // hors ligne : l'index gardé sur l'appareil sert même périmé
+      try { const c = await idbRun('pois', 'readonly', o => o.get('pkidx1')); if (c && c.idx) { pkPrep(c.idx); await pkStored(); PK.at = Date.now() - 25 * 60e3; return PK.idx; } } catch (e2) {}
+      pkPrep({ packs: [] });
+    }
+    PK.at = Date.now() - 25 * 60e3;   // nouvel essai dans 5 min
+  }
   try { localStorage.removeItem('pmr-pk-idx'); } catch (e) {} // ancien emplacement de l'index
   await pkStored();
   return PK.idx;
@@ -10058,21 +10064,23 @@ async function ocPtsOf(id) {
 }
 async function ocRefresh() { try { OC.list = await ocTraceList(); } catch (e) { OC.list = []; } ocUI(); }
 const ocOf = id => OC.list.find(m => m.id === id);
+const ocDone = m => !!m && m.status === 'done' && !!m.poi;   // fond, relief, polices ET points utiles
 async function ocEst(id) { if (OC.est[id] != null) return OC.est[id]; const p = await ocPtsOf(id); OC.est[id] = p ? ocPlan(p).est : 0; return OC.est[id]; }
 function ocStateTxt(id) {
   if (OC.busy === id && OC.prog) return T("{0} %", [Math.min(99, Math.round(OC.prog.done / Math.max(1, OC.prog.total) * 100))]);
+  if (OC.busy === id && OC.poi) return OC.poi;
   if (OC.busy === id) return T("Préparation…");
   const m = ocOf(id); if (!m) return OC.est[id] ? '~' + pkMo(OC.est[id]) : '';
-  return m.status === 'done' ? T("Gardée · {0}", [pkMo(m.bytes || 0)]) : T("Incomplète · reprendre");
+  return ocDone(m) ? T("Gardée · {0}", [pkMo(m.bytes || 0)]) : T("Incomplète · reprendre");
 }
 function ocUI() {
   const cur = LIB && LIB.current, gb = $('#ocGetBtn');
   if (gb) {
     const m = cur && ocOf(cur), busy = cur && OC.busy === cur;
     gb.classList.toggle('busy', !!busy);
-    gb.textContent = busy ? T("{0} · Annuler", [ocStateTxt(cur)]) : m && m.status === 'done' ? T("Carte gardée ✓") : m ? T("Reprendre la carte hors ligne") : OC.est[cur] ? T("Garder la carte · ~{0}", [pkMo(OC.est[cur])]) : T("Garder la carte");
+    gb.textContent = busy ? T("{0} · Annuler", [ocStateTxt(cur)]) : ocDone(m) ? T("Carte gardée ✓") : m ? T("Reprendre la carte hors ligne") : OC.est[cur] ? T("Garder la carte · ~{0}", [pkMo(OC.est[cur])]) : T("Garder la carte");
   }
-  const d = $('#lpDlg'); if (d && d.open && LP.sheet) { const b = $('#lpDlgOc'); b.querySelector('.r').textContent = ocStateTxt(LP.sheet); b.querySelector('.ocl').textContent = OC.busy === LP.sheet ? T("Annuler le téléchargement") : ocOf(LP.sheet) && ocOf(LP.sheet).status === 'done' ? T("Supprimer la carte hors ligne") : T("Garder la carte hors ligne"); }
+  const d = $('#lpDlg'); if (d && d.open && LP.sheet) { const b = $('#lpDlgOc'); b.querySelector('.r').textContent = ocStateTxt(LP.sheet); b.querySelector('.ocl').textContent = OC.busy === LP.sheet ? T("Annuler le téléchargement") : ocDone(ocOf(LP.sheet)) ? T("Supprimer la carte hors ligne") : T("Garder la carte hors ligne"); }
   ocMeRender();
 }
 async function ocStart(id) {
@@ -10089,17 +10097,27 @@ async function ocStart(id) {
   ocUI();
   try {
     const m = await ocDownload(id, pts, { name: r && r.name, signal: OC.ab.signal, onProgress: p => { OC.prog = p; ocUI(); } });
-    toast(m.status === 'done' ? T("Carte hors ligne prête : {0}", [pkMo(m.bytes || 0)]) : T("Téléchargement interrompu : tu peux le reprendre."));
+    if (!OC.ab.signal.aborted) {   // points utiles : packs des pays traversés (même France, dont la base n'est pas lisible hors ligne)
+      OC.poi = T("Points utiles…"); ocUI();
+      try {
+        await pkIndex(); const need = new Map();
+        for (let i = 0; i < pts.length; i += 40) { const p = pkOwn(pts[i].lat, pts[i].lon); if (p && !PK.stored.has(p.file) && pkAllowed(p)) need.set(p.file, p); }
+        for (const p of need.values()) { if (OC.ab.signal.aborted) break; OC.poi = T("Points utiles · {0}…", [pkCcName(p)]); ocUI(); await pkBlob(p); }
+        PK.done.clear(); if (!OC.ab.signal.aborted) { m.poi = true; await ocTraceSave(m); }
+      } catch (e) { m.status = 'partial'; m.poiFail = true; await ocTraceSave(m); }
+      OC.poi = '';
+    }
+    toast(ocDone(m) ? T("Carte hors ligne prête : {0}", [pkMo(m.bytes || 0)]) : T("Téléchargement interrompu : tu peux le reprendre."));
   } catch (e) { if (!OC.ab.signal.aborted) toast(T("Téléchargement impossible. Réessaie plus tard.")); }
   finally { OC.busy = ''; OC.ab = null; OC.prog = null; try { wl && wl.release(); } catch (e) {} await ocRefresh(); }
 }
 async function ocAction(id) {
   if (OC.busy === id) { OC.ab && OC.ab.abort(); return; }
   const m = ocOf(id);
-  if (m && m.status === 'done') { await ocTraceDelete(id); toast(T("Carte hors ligne supprimée.")); await ocRefresh(); return; }
+  if (ocDone(m)) { await ocTraceDelete(id); toast(T("Carte hors ligne supprimée.")); await ocRefresh(); return; }
   ocStart(id);
 }
-$('#ocGetBtn').addEventListener('click', () => { const id = LIB.current; if (!id) return; const m = ocOf(id); if (m && m.status === 'done') { meOpen(); return; } ocAction(id); });
+$('#ocGetBtn').addEventListener('click', () => { const id = LIB.current; if (!id) return; const m = ocOf(id); if (ocDone(m)) { meOpen(); return; } ocAction(id); });
 // zone hors ligne dessinée sur la carte : 4 bandes de largeur réelle (15, 10, 4 et 1,5 km de chaque côté)
 function ocZoneDraw() {
   if (OC.zone) { map.removeLayer(OC.zone.g); map.off('zoomend', OC.zone.fn); OC.zone = null; }
@@ -10117,7 +10135,7 @@ async function ocMeRender() {
   const tot = L2.reduce((s, m) => s + (m.bytes || 0), 0), sp = await ocSpace();
   $('#meOcSum').textContent = L2.length ? T("{0} trace(s) · {1} sur ton appareil", [L2.length, pkMo(tot)]) + (sp ? T(" · {0} libres", [pkMo(sp.libre)]) : '') : T("Aucune trace gardée hors ligne pour l'instant.");
   const bar = $('#meOcBar'); bar.hidden = !sp; if (sp) bar.firstElementChild.style.width = Math.min(100, Math.max(1, sp.usage / sp.quota * 100)) + '%';
-  box.innerHTML = L2.map(m => `<div class="pk-row have off-row" data-id="${escH(m.id)}"><span class="pk-cc">▤</span><span class="pk-nm">${escH(m.name || m.id)}<small>${escH(ocStateTxt(m.id))}${m.finished ? ' · ' + escH(new Date(m.finished).toLocaleDateString(LOC, { day: 'numeric', month: 'short' })) : ''}</small></span><span class="off-act">${OC.busy === m.id ? `<button type="button" class="btn small" data-act="stop">${escH(T("Annuler"))}</button>` : `${m.status !== 'done' ? `<button type="button" class="btn small" data-act="go">${escH(T("Reprendre"))}</button>` : ''}<button type="button" class="btn small" data-act="del">${escH(T("Supprimer"))}</button>`}</span></div>`).join('');
+  box.innerHTML = L2.map(m => `<div class="pk-row have off-row" data-id="${escH(m.id)}"><span class="pk-cc">▤</span><span class="pk-nm">${escH(m.name || m.id)}<small>${escH(ocStateTxt(m.id))}${m.finished ? ' · ' + escH(new Date(m.finished).toLocaleDateString(LOC, { day: 'numeric', month: 'short' })) : ''}</small></span><span class="off-act">${OC.busy === m.id ? `<button type="button" class="btn small" data-act="stop">${escH(T("Annuler"))}</button>` : `${!ocDone(m) ? `<button type="button" class="btn small" data-act="go">${escH(T("Reprendre"))}</button>` : ''}<button type="button" class="btn small" data-act="del">${escH(T("Supprimer"))}</button>`}</span></div>`).join('');
   const w = $('#meOcWifi'); if (w) w.checked = ocWifi();
 }
 $('#meOcRows').addEventListener('click', e => {
@@ -10198,7 +10216,11 @@ async function pmLoadOsm() {
       if (PK_ON && pkTileHas(k)) xKeys.push(k); // les types arrivés après l'import de la base (toilettes, douches…) viennent du pack du pays
       PM.busy.add(k); PM.running++; pmStatus();
       pmFromBase(k).then(items => { PM.tiles.set(k, true); PM.failed = 0; pmAddItems(items); })
-        .catch(() => { PM.cov = []; PM.queue.push(k); }) // base injoignable : Overpass
+        .catch(async () => { // base injoignable : le pack gardé sur l'appareil, sinon Overpass
+          PM.cov = [];
+          if (PK_ON && pkTileHas(k)) { try { const got = await pkTiles([k]); if (got.has(k)) { PM.tiles.set(k, true); pmAddItems(pkPm(got.get(k))); return; } } catch (e) {} }
+          PM.queue.push(k);
+        })
         .finally(() => { PM.busy.delete(k); PM.running--; pmRender(); pmPump(); });
       continue;
     }
