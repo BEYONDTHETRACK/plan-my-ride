@@ -404,6 +404,12 @@ html[data-motion="reduce"] dialog.kind-dlg{animation:none}
 /* Ultra : pays traversés et packs de points hors ligne (12/11/2026) */
 .pk-kick{font:600 11px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:2px 44px 6px 0}
 .pk-dlg h2{margin:0 0 6px}
+.off-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.off-act .btn.small{min-height:36px;padding:0 12px}
+.off-act .btn.small.arm{background:var(--head);border-color:var(--head);color:#fff}
+.off-add{display:flex;gap:8px;align-items:center;margin-top:12px}
+.off-add select{flex:1;min-width:0}
+.off-upd{font-size:12px;font-weight:600;color:color-mix(in srgb,var(--sun) 60%,var(--ink))}
 .pk-rows{margin:12px 0 10px;border-top:1px solid var(--line)}
 .pk-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
 .pk-cc{font:600 12px var(--f-mono);min-width:34px;height:26px;border-radius:7px;display:grid;place-items:center;background:color-mix(in srgb,var(--ink) 6%,var(--panel))}
@@ -1472,6 +1478,10 @@ dialog.lp-dlg::backdrop{background:rgba(20,32,27,.38)}
 .lp-dacts button svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .lp-dacts button .r{margin-left:auto;font-size:13px;font-weight:500;color:var(--muted)}
 .lp-dacts button.danger{color:var(--head)}
+.oc-bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0}
+.oc-bar i{display:block;height:100%;width:0;background:var(--brand);border-radius:99px}
+#ocGetBtn.busy{background:var(--panel);color:var(--ink)}
+#ocZoneBtn[aria-pressed=true]{background:var(--ink);color:var(--panel)}
 .lp-dacts button.danger.arm{background:color-mix(in srgb,var(--head) 12%,var(--panel));border-radius:10px;padding:0 10px}
 .lp-dlg .lp-ren{padding:0;grid-column:auto}
 @media (max-width:700px){
@@ -1875,6 +1885,7 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     <div class="lp-dacts no-guest">
       <button type="button" data-act="ren"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4"/></svg>Renommer</button>
       <button type="button" data-act="rev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M7 17h10M4 4l3 3-3 3M20 14l-3 3 3 3"/></svg>Inverser le sens<span class="r" id="lpDlgRev"></span></button>
+      <button type="button" data-act="oc" id="lpDlgOc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg><span class="ocl">Garder la carte hors ligne</span><span class="r"></span></button>
       <button type="button" data-act="gpx"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exporter le GPX</button>
       <button type="button" data-act="del" class="danger" id="lpDlgDel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Supprimer<span class="r">deux appuis</span></button>
     </div>
@@ -1930,6 +1941,20 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
       </details>
       <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
     </div></div>
+  <div class="me-card no-guest" id="meOcCard"><h3>Cartes de mes traces, hors ligne</h3>
+    <p class="hint">Le fond de carte, le relief et les points utiles à 15 km de chaque trace gardée, de plus en plus détaillés près du tracé. Tu les gardes depuis la carte d'une sortie ou depuis Mes parcours.</p>
+    <p class="hint" id="meOcSum"></p>
+    <div class="oc-bar" id="meOcBar" hidden><i></i></div>
+    <div class="pk-rows" id="meOcRows"></div>
+    <label class="arrows-toggle"><input type="checkbox" id="meOcWifi"> Seulement en Wi-Fi</label>
+    <p class="hint al-msg" id="meOcMsg" aria-live="polite"></p></div>
+  <div class="me-card no-guest" id="meOffCard"><h3>Cartes hors ligne</h3>
+    <p class="hint">Les points utiles (eau, ravitos, hébergements…) et les villes, gardés sur ton téléphone pays par pays : la Carte et Ultra marchent alors sans réseau.</p>
+    <p class="hint" id="meOffSum"></p>
+    <div class="pk-rows" id="meOffRows"></div>
+    <div class="off-add" id="meOffAdd"><select id="meOffSel" class="me-sel" aria-label="Pays à ajouter"></select><button type="button" class="btn small primary" id="meOffGo">Télécharger</button></div>
+    <p class="me-btns"><button type="button" class="linkbtn" id="meOffAll" hidden>Tout supprimer</button></p>
+    <p class="hint al-msg" id="meOffMsg" aria-live="polite"></p></div>
   <p class="me-gl">Affichage</p>
   <div class="me-list">
     <details class="me-li" id="meLiTheme"><summary><span class="me-lt"><b>Thème</b></span><span class="me-lv" id="meVTheme"></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary><div class="me-lb"><div class="seg2 me-theme" id="meTheme" role="group" aria-label="Thème"><button type="button" data-t="light">Clair</button><button type="button" data-t="auto">Automatique</button><button type="button" data-t="dark">Sombre</button></div></div></details>
@@ -2191,6 +2216,8 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
         <h2>Carte météo du parcours</h2>
         <button class="btn small" id="mapOptsBtn" type="button" aria-pressed="false">Affichage</button>
         <button class="btn small" id="fsBtn" type="button" title="Afficher la carte en plein écran">Plein écran</button>
+        <button class="btn small no-guest" id="ocZoneBtn" type="button" aria-pressed="false" title="Montre la zone de carte que tu auras sans réseau">Zone hors ligne</button>
+        <button class="btn small primary no-guest" id="ocGetBtn" type="button">Garder la carte</button>
         <button class="btn small" id="exportImg" type="button" title="Image PNG de la carte (vue actuelle) avec le vent, et du profil météo">Exporter l'image</button>
         <label class="arrows-toggle"><input type="checkbox" id="arrowsOn" checked> Flèches de vent</label>
         <label class="arrows-toggle"><input type="checkbox" id="skyOn" checked> Ciel</label>
@@ -3682,6 +3709,7 @@ function trendRender() {
 
 function renderAll(opts, opt) {
   renderSummary(opt); renderMap(); renderChart(); renderTable(); renderOpts(opts, opt); renderHours(); renderPois(); renderPlan(); renderLaps(); renderWeek();
+  try { if (typeof ocZoneDraw === 'function') { ocZoneDraw(); if (LIB.current) { ocEst(LIB.current).then(ocUI); } } } catch (e) {}
 }
 
 function renderSummary(opt) {
@@ -3856,10 +3884,278 @@ try { if (!localStorage.getItem('pmr-sgl-def2')) { localStorage.setItem('pmr-sgl
 const SGL_JS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const SGL_CSS = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css';
 let sglP = null;
+// ===== Carte hors ligne d'une trace : couloir de tuiles (calcul pur, sans réseau) =====
+// Couloir dégressif : plus on zoome, plus il est étroit (rayons en km autour de la trace).
+const OC_RADII = [[11, 15], [12, 10], [13, 4], [14, 1.5]]; // [zoom maxi, rayon] ; zooms 0–11 : 15 km
+const OC_MAXZ = 14;
+// Poids moyen d'une tuile vectorielle / de relief, en Ko, par zoom (À CALIBRER sur les packs R2 : LU = 36 Mo pour 1 932 tuiles).
+const OC_KB = { vec: { 0: 20, 11: 28, 12: 26, 13: 22, 14: 18 }, dem: 30 };
+function ocRadius(z) { for (const [zm, r] of OC_RADII) if (z <= zm) return r; return 0; }
+function ocTileXY(lat, lon, z) {
+  const n = 2 ** z, la = Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180;
+  return [(lon + 180) / 360 * n, (1 - Math.log(Math.tan(la) + 1 / Math.cos(la)) / Math.PI) / 2 * n];
+}
+function ocTileLat(y, z) { const n = Math.PI - 2 * Math.PI * y / 2 ** z; return 180 / Math.PI * Math.atan(Math.sinh(n)); }
+// Tuiles (clés « z/x/y ») à moins de `rKm` d'un point de la trace (distance au rectangle de la tuile, pas au centre).
+function ocCorridor(pts, z, rKm) {
+  const out = new Set(), n = 2 ** z, step = Math.max(0.2, rKm / 3), slack = step / 2 + 0.05;
+  const R = rKm + slack, kLat = 111.32;
+  let carry = 0, prev = null;
+  const visit = (lat, lon) => {
+    const kLon = kLat * Math.cos(lat * Math.PI / 180), dLat = R / kLat, dLon = R / Math.max(kLon, 1e-6);
+    const [x0, y1] = ocTileXY(lat - dLat, lon - dLon, z), [x1, y0] = ocTileXY(lat + dLat, lon + dLon, z);
+    for (let x = Math.floor(x0); x <= Math.floor(x1); x++) for (let y = Math.floor(y0); y <= Math.floor(y1); y++) {
+      if (y < 0 || y >= n) continue;
+      const xm = ((x % n) + n) % n, key = z + '/' + xm + '/' + y;
+      if (out.has(key)) continue;
+      const w = x / n * 360 - 180, e = (x + 1) / n * 360 - 180, nn = ocTileLat(y, z), s = ocTileLat(y + 1, z);
+      const cl = Math.max(s, Math.min(nn, lat)), co = Math.max(w, Math.min(e, lon));
+      const dy = (cl - lat) * kLat, dx = (co - lon) * kLon;
+      if (dx * dx + dy * dy <= R * R) out.add(key);
+    }
+  };
+  for (const p of pts) {
+    if (prev) {
+      const dk = Math.hypot((p.lat - prev.lat) * kLat, (p.lon - prev.lon) * kLat * Math.cos(p.lat * Math.PI / 180));
+      let t = step - carry;
+      while (t < dk) { const f = t / dk; visit(prev.lat + (p.lat - prev.lat) * f, prev.lon + (p.lon - prev.lon) * f); t += step; }
+      carry = (carry + dk) % step;
+    } else visit(p.lat, p.lon);
+    prev = p;
+  }
+  if (prev) visit(prev.lat, prev.lon);
+  return out;
+}
+// Toutes les tuiles du couloir dégressif : { vec: [clés], dem: [clés ≤ zoom 11], est: octets estimés }.
+function ocPlan(pts) {
+  const vec = [], dem = [];
+  for (let z = 0; z <= OC_MAXZ; z++) {
+    const set = ocCorridor(pts, z, z < 4 ? 20000 : ocRadius(z));
+    for (const k of set) { vec.push(k); if (z <= 11) dem.push(k); }
+  }
+  let est = dem.length * OC_KB.dem * 1024;
+  for (const k of vec) { const z = +k.split('/')[0]; est += (OC_KB.vec[z] ?? (z < 11 ? OC_KB.vec[0] : OC_KB.vec[14])) * 1024; }
+  return { vec, dem, est };
+}
+
+// ===== Lecteur PMTiles v3 (lecture par morceaux HTTP Range) =====
+function pmtZxyToId(z, x, y) {
+  if (z === 0) return 0;
+  let acc = 0; for (let t = 0; t < z; t++) acc += 4 ** t;
+  const n = 2 ** z; let d = 0;
+  for (let s = n / 2; s > 0; s = Math.floor(s / 2)) {
+    const rx = (x & s) > 0 ? 1 : 0, ry = (y & s) > 0 ? 1 : 0;
+    d += s * s * ((3 * rx) ^ ry);
+    if (ry === 0) { if (rx === 1) { x = n - 1 - x; y = n - 1 - y; } const t = x; x = y; y = t; }
+  }
+  return acc + d;
+}
+async function pmtGunzip(buf) {
+  const ds = new DecompressionStream('gzip');
+  return new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer());
+}
+async function pmtRange(url, off, len, signal) {
+  const r = await fetch(url, { headers: { Range: 'bytes=' + off + '-' + (off + len - 1) }, signal });
+  if (r.status !== 206 && r.status !== 200) throw new Error('HTTP ' + r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  return r.status === 200 ? b.slice(off, off + len) : b;
+}
+function pmtHeader(b) {
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength), u = o => Number(dv.getBigUint64(o, true));
+  if (String.fromCharCode(...b.slice(0, 7)) !== 'PMTiles' || b[7] !== 3) throw new Error('pas un PMTiles v3');
+  return { rootOff: u(8), rootLen: u(16), leafOff: u(40), dataOff: u(56), intComp: b[97], tileComp: b[98], minZ: b[100], maxZ: b[101] };
+}
+function pmtDir(b) {
+  let p = 0;
+  const vi = () => { let r = 0, s = 0, c; do { c = b[p++]; r += (c & 127) * 2 ** s; s += 7; } while (c & 128); return r; };
+  const n = vi(), e = new Array(n);
+  let id = 0;
+  for (let i = 0; i < n; i++) { id += vi(); e[i] = { id, run: 0, len: 0, off: 0 }; }
+  for (let i = 0; i < n; i++) e[i].run = vi();
+  for (let i = 0; i < n; i++) e[i].len = vi();
+  for (let i = 0; i < n; i++) { const v = vi(); e[i].off = v === 0 && i > 0 ? e[i - 1].off + e[i - 1].len : v - 1; }
+  return e;
+}
+function pmtFind(es, id) {
+  let lo = 0, hi = es.length - 1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (es[m].id <= id) lo = m + 1; else hi = m - 1; }
+  if (hi < 0) return null;
+  const e = es[hi];
+  if (e.run === 0) return e;                // pointe vers un répertoire de feuilles
+  return id - e.id < e.run ? e : null;
+}
+// Ouvre un PMTiles distant : { get(z,x,y) -> Uint8Array décompressé | null, header }
+async function pmtOpen(url, signal) {
+  const head = await pmtRange(url, 0, 16384, signal), h = pmtHeader(head);
+  const unz = async (b, c) => c === 2 ? pmtGunzip(b) : b;
+  const root = pmtDir(await unz(head.slice(h.rootOff, h.rootOff + h.rootLen), h.intComp));
+  const leaves = new Map();
+  return {
+    header: h,
+    async get(z, x, y, sig) {
+      const id = pmtZxyToId(z, x, y); let es = root;
+      for (let d = 0; d < 4; d++) {
+        const e = pmtFind(es, id); if (!e) return null;
+        if (e.run > 0) return unz(await pmtRange(url, h.dataOff + e.off, e.len, sig), h.tileComp);
+        const k = e.off; if (!leaves.has(k)) leaves.set(k, pmtDir(await unz(await pmtRange(url, h.leafOff + e.off, e.len, sig), h.intComp)));
+        es = leaves.get(k);
+      }
+      return null;
+    }
+  };
+}
+
+// ===== Stockage hors ligne (IndexedDB « sillage-offline ») et téléchargement d'un couloir =====
+const OC_R2 = 'https://pub-77808f07935f4974bed44a9e8f2917d0.r2.dev';
+const OC_DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+const OC_VER = 'v1';                   // change si le fournisseur / le schéma des tuiles change : les anciennes tuiles ne sont plus lues
+let OC_DB = null;
+function ocDb() {
+  return OC_DB || (OC_DB = new Promise((res, rej) => {
+    const q = indexedDB.open('sillage-offline', 1);
+    q.onupgradeneeded = () => { const d = q.result; d.createObjectStore('tiles', { keyPath: 'k' }); d.createObjectStore('traces', { keyPath: 'id' }); d.createObjectStore('assets', { keyPath: 'k' }); };
+    q.onsuccess = () => res(q.result); q.onerror = () => { OC_DB = null; rej(q.error); };
+  }));
+}
+const ocReq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const ocKey = (z, x, y) => OC_VER + '|' + z + '/' + x + '/' + y;
+async function ocTileGet(z, x, y) { const r = await ocReq((await ocDb()).transaction('tiles').objectStore('tiles').get(ocKey(z, x, y))); return r ? r.d : null; }
+// Range plusieurs tuiles d'un coup (une transaction) et rattache la trace : { clé: Uint8Array | null (absente) }
+async function ocTilesPut(traceId, batch) {
+  const db = await ocDb(), tx = db.transaction('tiles', 'readwrite'), st = tx.objectStore('tiles');
+  await Promise.all(batch.map(async ([k, d]) => {
+    const cur = await ocReq(st.get(k));
+    if (cur) { if (!cur.r.includes(traceId)) { cur.r.push(traceId); st.put(cur); } }
+    else st.put({ k, d, r: [traceId] });
+  }));
+  await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error); });
+}
+async function ocTilesHas(traceId, keys) {         // clés déjà rangées ET rattachées à cette trace (reprise)
+  const st = (await ocDb()).transaction('tiles').objectStore('tiles'), out = new Set();
+  await Promise.all(keys.map(async k => { const c = await ocReq(st.get(k)); if (c && c.r.includes(traceId)) out.add(k); }));
+  return out;
+}
+async function ocTraceSave(m) { const tx = (await ocDb()).transaction('traces', 'readwrite'); tx.objectStore('traces').put(m); await new Promise(r => tx.oncomplete = r); }
+async function ocTraceGet(id) { return ocReq((await ocDb()).transaction('traces').objectStore('traces').get(id)); }
+async function ocTraceList() { return ocReq((await ocDb()).transaction('traces').objectStore('traces').getAll()); }
+// Supprime la trace : ses tuiles ne sont effacées que si aucune autre trace ne les utilise.
+async function ocTraceDelete(id) {
+  const db = await ocDb(), tx = db.transaction(['tiles', 'traces'], 'readwrite'), st = tx.objectStore('tiles');
+  st.openCursor().onsuccess = e => {
+    const c = e.target.result; if (!c) return;
+    const v = c.value, i = v.r.indexOf(id);
+    if (i >= 0) { v.r.splice(i, 1); if (v.r.length) c.update(v); else c.delete(); }
+    c.continue();
+  };
+  tx.objectStore('traces').delete(id);
+  await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error); });
+}
+// Place disponible : { quota, usage, libre } ou null si le navigateur ne sait pas
+async function ocSpace() { try { const e = await navigator.storage.estimate(); return { quota: e.quota, usage: e.usage, libre: e.quota - e.usage }; } catch (_) { return null; } }
+// Index des packs pays sur R2 (6 h en mémoire de session)
+let OC_IDX = null;
+async function ocIndex() {
+  if (OC_IDX && Date.now() - OC_IDX.t < 6 * 3600e3) return OC_IDX.packs;
+  const r = await fetch(OC_R2 + '/tiles/index.json', { cache: 'no-cache' }); if (!r.ok) throw new Error('index HTTP ' + r.status);
+  const packs = (await r.json()).packs.map(p => ({ ...p, area_km2: Math.abs((p.bbox[2] - p.bbox[0]) * (p.bbox[3] - p.bbox[1])) }));
+  OC_IDX = { t: Date.now(), packs }; return packs;
+}
+// Packs dont le rectangle contient le centre de la tuile, du plus petit au plus grand (le plus précis d'abord)
+function ocPacksFor(packs, z, x, y) {
+  const lat = ocTileLat(y + 0.5, z), lon = (x + 0.5) / 2 ** z * 360 - 180;
+  return packs.filter(p => lat >= p.bbox[0] && lat <= p.bbox[2] && lon >= p.bbox[1] && lon <= p.bbox[3]).sort((a, b) => a.area_km2 - b.area_km2);
+}
+// Télécharge le couloir d'une trace. opts : { name, signal, onProgress({done,total,bytes,missing}), parallel }
+// Reprend là où il s'était arrêté. Renvoie le manifeste final.
+async function ocDownload(id, pts, opts = {}) {
+  const plan = ocPlan(pts), packs = await ocIndex();
+  const all = plan.vec.concat(plan.dem.map(k => 'd/' + k)), total = all.length;   // « d/z/x/y » = tuile de relief
+  const m = (await ocTraceGet(id)) || { id, created: Date.now() };
+  Object.assign(m, { name: opts.name || m.name || id, total, est: plan.est, status: 'downloading', done: 0, bytes: m.bytes || 0, missing: 0 });
+  await ocTraceSave(m);
+  const have = new Set(); for (let i = 0; i < total; i += 400) (await ocTilesHas(id, all.map(k => OC_VER + '|' + k).slice(i, i + 400))).forEach(k => have.add(k));
+  const todo = all.filter(k => !have.has(OC_VER + '|' + k)); m.done = total - todo.length;
+  const src = new Map(), openPack = p => { if (!src.has(p.cc)) src.set(p.cc, pmtOpen(OC_R2 + '/' + p.file, opts.signal)); return src.get(p.cc); };
+  let next = 0, buf = [], failed = 0;
+  const flush = async () => { const b = buf; buf = []; if (b.length) { await ocTilesPut(id, b); } m.bytes = (m.bytes || 0); await ocTraceSave(m); opts.onProgress && opts.onProgress({ done: m.done, total, bytes: m.bytes, missing: m.missing }); };
+  const worker = async () => {
+    for (;;) {
+      if (opts.signal && opts.signal.aborted) return;
+      const i = next++; if (i >= todo.length) return;
+      const isDem = todo[i][0] === 'd', [z, x, y] = (isDem ? todo[i].slice(2) : todo[i]).split('/').map(Number);
+      let d = null;
+      try {
+        if (isDem) { const r = await fetch(OC_DEM.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal: opts.signal }); if (r.ok) d = new Uint8Array(await r.arrayBuffer()); else if (r.status !== 404) throw new Error('DEM HTTP ' + r.status); }
+        else for (const p of ocPacksFor(packs, z, x, y)) { d = await (await openPack(p)).get(z, x, y, opts.signal); if (d) break; }
+      }
+      catch (e) { if (opts.signal && opts.signal.aborted) return; failed++; if (failed > 25) throw e; continue; }
+      if (d) { buf.push([OC_VER + '|' + todo[i], d]); m.bytes += d.byteLength; } else m.missing++;
+      m.done++;
+      if (buf.length >= 50) await flush();
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: opts.parallel || 4 }, worker)); await flush();
+    for (const st of OC_FONTS) for (const rg of OC_GLYPH_RANGES) { if (opts.signal && opts.signal.aborted) break; await ocGlyph(st, rg, opts.signal); }   // polices (communes à toutes les traces)
+  }
+  catch (e) { m.status = 'partial'; await flush(); throw e; }
+  m.status = (opts.signal && opts.signal.aborted) ? 'partial' : (failed ? 'partial' : 'done'); m.finished = Date.now();
+  await ocTraceSave(m); return m;
+}
+
+
+// ----- Protocoles MapLibre : tuiles vectorielles et polices lues d'abord sur l'appareil, puis sur le réseau -----
+async function ocAssetGet(k) { const r = await ocReq((await ocDb()).transaction('assets').objectStore('assets').get(k)); return r ? r.d : null; }
+async function ocAssetPut(k, d) { const tx = (await ocDb()).transaction('assets', 'readwrite'); tx.objectStore('assets').put({ k, d }); await new Promise(r => { tx.oncomplete = r; tx.onerror = r; }); }
+const OC_GLYPH_RANGES = ['0-255', '256-511', '512-767', '768-1023', '1024-1279', '1280-1535', '1536-1791', '1792-2047', '8192-8447'];
+const OC_FONTS = ['Noto Sans Regular', 'Noto Sans Bold', 'Noto Sans Italic'];
+async function ocGlyph(stack, range, signal, store) {
+  const k = 'g|' + stack + '|' + range; let d = null;
+  try { d = await ocAssetGet(k); } catch (_) {}
+  if (d) return d;
+  for (const u of [OC_R2 + '/fonts/' + encodeURIComponent(stack) + '/' + range + '.pbf', 'https://tiles.openfreemap.org/fonts/' + encodeURIComponent(stack) + '/' + range + '.pbf']) {
+    try { const r = await fetch(u, { signal }); if (r.ok) { d = await r.arrayBuffer(); break; } } catch (e) { if (signal && signal.aborted) throw e; }
+  }
+  if (!d) return null;
+  try { await ocAssetPut(k, d); } catch (_) {}
+  return d;
+}
+let OC_PROTO = false;
+function ocProtocols() {
+  if (OC_PROTO || !window.maplibregl) return; OC_PROTO = true;
+  maplibregl.addProtocol('sglo', async (p, ac) => {       // sglo://z/x/y : tuile vectorielle
+    const [z, x, y] = p.url.slice(7).split('/').map(Number);
+    try { const d = await ocTileGet(z, x, y); if (d) return { data: d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) }; } catch (_) {}
+    if (navigator.onLine === false) return { data: new ArrayBuffer(0) };      // hors ligne, hors couloir : tuile vide, sans erreur
+    try {
+      const tpl = await plTpl(), r = await fetch(tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal: ac.signal });
+      if (r.status === 404 || r.status === 204) return { data: new ArrayBuffer(0) };
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return { data: await r.arrayBuffer() };
+    } catch (e) { if (ac.signal.aborted) throw e; return { data: new ArrayBuffer(0) }; }
+  });
+  maplibregl.addProtocol('sgld', async (p, ac) => {       // sgld://z/x/y : relief (terrarium), appareil d'abord
+    const [z, x, y] = p.url.slice(7).split('/').map(Number);
+    try { const d = await ocReq((await ocDb()).transaction('tiles').objectStore('tiles').get(OC_VER + '|d/' + z + '/' + x + '/' + y)); if (d && d.d) return { data: d.d.buffer.slice(d.d.byteOffset, d.d.byteOffset + d.d.byteLength) }; } catch (_) {}
+    if (navigator.onLine === false) return { data: new ArrayBuffer(0) };
+    try {
+      const r = await fetch(OC_DEM.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal: ac.signal });
+      if (!r.ok) return { data: new ArrayBuffer(0) };
+      return { data: await r.arrayBuffer() };
+    } catch (e) { if (ac.signal.aborted) throw e; return { data: new ArrayBuffer(0) }; }
+  });
+  maplibregl.addProtocol('sglg', async (p, ac) => {       // sglg://<police>/<plage>.pbf : polices
+    const m = /^sglg:\/\/(.+)\/([^/]+)\.pbf$/.exec(p.url); if (!m) throw new Error('police ?');
+    const d = await ocGlyph(decodeURIComponent(m[1]), m[2], ac.signal);
+    if (!d) throw new Error('police indisponible');
+    return { data: d };
+  });
+}
+
 function sglLoad() {
   if (sglP) return sglP;
   if (!document.querySelector('link[data-sgl]')) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = SGL_CSS; l.dataset.sgl = '1'; document.head.appendChild(l); }
-  return (sglP = loadScript(SGL_JS).then(() => !!window.maplibregl).catch(() => { sglP = null; return false; }));
+  return (sglP = loadScript(SGL_JS).then(() => { if (window.maplibregl) ocProtocols(); return !!window.maplibregl; }).catch(() => { sglP = null; return false; }));
 }
 const SGL_PAL = {
   light: { bg: '#EEF0EA', forest: '#D3E1CC', grass: '#E2EADB', farm: '#ECEEE4', urban: '#E6E3DD', rock: '#E4E2DC', water: '#B9D3E6', waterLine: '#8FB6D4', waterLabel: '#3E6E94', build: '#DCD8D1', minor: '#FFFFFF', minorCase: '#D3D6CF', major: '#FFF3D6', majorCase: '#E0C88E', hwy: '#F6D58A', hwyCase: '#C9A24A', path: '#2E7D4F', cyc: '#178A4E', cycCase: '#FFFFFF', dirt: '#A47A45', ink: '#14201B', ink2: '#4C5852', halo: '#F6F7F3', border: '#9A7FB0', shade: '#14201B', hl: '#FFFFFF', ex: 0.3 },
@@ -3873,10 +4169,10 @@ function sglStyle(p) {
   const CYC = ['all', cls(['path', 'track']), ['any', ['==', ['get', 'subclass'], 'cycleway'], ['==', ['get', 'bicycle'], 'designated']]];
   const road = (id, c, w, filt, mz) => Object.assign({ id, type: 'line', source: 'om', 'source-layer': 'transportation', filter: filt, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': c, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom']].concat(w) } }, mz ? { minzoom: mz } : {});
   return {
-    version: 8, glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    version: 8, glyphs: 'sglg://{fontstack}/{range}.pbf',
     sources: {
-      om: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
-      dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 13 }
+      om: { type: 'vector', tiles: ['sglo://{z}/{x}/{y}'], minzoom: 0, maxzoom: 14 },
+      dem: { type: 'raster-dem', tiles: ['sgld://{z}/{x}/{y}'], encoding: 'terrarium', tileSize: 256, maxzoom: 11 }
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': p.bg } },
@@ -8253,6 +8549,7 @@ $('#lpDlg').addEventListener('click', async e => {
   if (act === 'ren') { LP.ren = id; lpSheetFill(); return; }
   if (act === 'rev') { const rev = !revGet(id); revSet(id, rev); if (id === LIB.current && S.fwd) { try { loadRoute(S.fwd, S.baseName, rev); } catch (err) { setStatus(err.message, 'err'); } } lpSheetFill(); return; }
   if (act === 'gpx') { lpGpx(id); return; }
+  if (act === 'oc') { ocAction(id); return; }
   if (act === 'del') {
     if (LP.del !== id) { LP.del = id; clearTimeout(LP.delT); LP.delT = setTimeout(() => { LP.del = ''; if ($('#lpDlg').open) lpSheetFill(); }, 4000); lpSheetFill(); return; }
     clearTimeout(LP.delT); LP.del = ''; const t = lpThumbs(); delete t[id]; try { localStorage.setItem('pmr-thumbs', JSON.stringify(t)); } catch (err) {}
@@ -8458,7 +8755,7 @@ function meRender() {
   $('#meVMotion').textContent = seg('meMotion'); $('#meVFont').textContent = seg('meFont').replace(/\s*\(.*\)/, '');
   meTafSel();
 }
-function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); }
+function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); }
 const ME_STEP = { speed: [12, 40, 0.5], vam: [300, 1400, 50], pmin: [0, 30, 1] };
 function meModesRender() {
   const m = ME.mode, g = meGet(m), fmt = { speed: v => fV(+v, 1) + ' ' + UL.kmh, vam: v => fE(+v) + ' ' + UL.mh, pmin: v => v + ' min' };
@@ -9079,6 +9376,141 @@ async function pkDownload() {
 $('#pkGo').addEventListener('click', pkDownload);
 $('#pkLater').addEventListener('click', () => { $('#pkDlg').close(); $('#pkLater').hidden = false; });
 $('#pkX').addEventListener('click', () => { $('#pkDlg').close(); $('#pkLater').hidden = false; });
+
+/* Cartes hors ligne (page Moi, 21/11/2026, index.html) : liste des packs de points déjà sur l'appareil (pays, taille, date,
+   « mise à jour disponible » quand la version de l'index a changé), mise à jour, suppression (deux appuis), « Tout supprimer »,
+   et téléchargement d'un pays choisi dans la liste sans passer par une trace. Mêmes fonctions que le panneau d'Ultra (pkBlob). */
+async function pkStoredInfo() {
+  const m = new Map();
+  try { const rs = await idbRun('pois', 'readonly', o => o.getAll(IDBKeyRange.bound('pk1|', 'pk1|\uffff'))); for (const r of rs || []) m.set(String(r.key).slice(4), { bytes: r.blob ? r.blob.size : 0, built: r.built, at: r.at }); } catch (e) {}
+  return m;
+}
+const pkVer = p => p.ver || (PK.idx.built + '|' + p.bytes);
+function offChanged() { PK.done.clear(); PK.tiles.clear(); try { if (typeof pmLoadOsm === 'function') pmLoadOsm(); } catch (e) {} }
+function offMsg(t, err) { const m = $('#meOffMsg'); if (m) { m.textContent = t || ''; m.classList.toggle('err', !!err); } }
+async function offRender() {
+  const box = $('#meOffRows'); if (!box || !PK_ON) return;
+  await pkIndex(); const info = await pkStoredInfo(), byFile = new Map((PK.idx.packs || []).map(p => [p.file, p]));
+  const have = [...info.entries()].map(([f, i]) => { const p = byFile.get(f); return { f, p, i, upd: !!(p && i.built !== pkVer(p)), name: p ? pkCcName(p) : f.replace(/\.ndjson\.gz$/, '') }; })
+    .sort((a, b) => a.name.localeCompare(b.name, LANG));
+  const tot = have.reduce((s, h) => s + (h.i.bytes || 0), 0);
+  $('#meOffSum').textContent = have.length ? T("{0} sur ton téléphone · {1}", [have.length > 1 ? T("{0} pays", [have.length]) : T("1 pays"), pkMo(tot)]) : T("Aucun pays sur ton téléphone pour l'instant.");
+  box.innerHTML = have.map(h => `<div class="pk-row have off-row" data-f="${escH(h.f)}"><span class="pk-cc">${escH(h.p && (h.p.cc || '').slice(0, 2) || '·')}</span>`
+    + `<span class="pk-nm">${escH(h.name)}<small>${escH(pkMo(h.i.bytes || (h.p ? h.p.bytes : 0)))}${h.i.at ? ' · ' + escH(new Date(h.i.at).toLocaleDateString(LOC, { day: 'numeric', month: 'short' })) : ''}${h.upd ? ' · <span class="off-upd">' + escH(T("Mise à jour disponible")) + '</span>' : ''}</small></span>`
+    + `<span class="off-act">${h.upd ? `<button type="button" class="btn small" data-act="upd">${escH(T("Mettre à jour"))}</button>` : ''}<button type="button" class="btn small" data-act="del">${escH(T("Supprimer"))}</button></span></div>`).join('');
+  const rest = (PK.idx.packs || []).filter(p => !info.has(p.file)).map(p => ({ p, name: pkCcName(p) })).sort((a, b) => a.name.localeCompare(b.name, LANG));
+  const lim = PK_LIM() && have.length >= 1;
+  $('#meOffAdd').hidden = !rest.length || lim;
+  $('#meOffSel').innerHTML = `<option value="">${escH(T("Ajouter un pays…"))}</option>` + rest.map(r => `<option value="${escH(r.p.file)}">${escH(r.name)} · ${escH(pkMo(r.p.bytes))}</option>`).join('');
+  $('#meOffAll').hidden = have.length < 2;
+  if (!PK.idx.packs.length && !have.length) offMsg(T("Liste des pays indisponible : vérifie ta connexion."), true);
+  else if (lim) offMsg(T("Compte gratuit : un seul pays hors ligne. Sillage.cc + les garde tous."));
+}
+async function offGet(files, btn) {
+  const wifi = (() => { try { return localStorage.getItem('pmr-pk-wifi') !== '0'; } catch (e) { return true; } })(), cn = navigator.connection;
+  if (wifi && cn && cn.type === 'cellular') { offMsg(T("Tu es en données mobiles. Décoche « Seulement en Wi-Fi » ou réessaie en Wi-Fi."), true); return; }
+  if (btn) btn.disabled = true; offMsg(''); let fail = [];
+  for (const f of files) {
+    const p = (PK.idx.packs || []).find(x => x.file === f); if (!p) continue;
+    offMsg(T("Téléchargement · {0}…", [pkCcName(p)])); PK.blobs.delete(f);
+    try { await pkBlob(p); } catch (e) { fail.push(pkCcName(p)); }
+  }
+  if (btn) btn.disabled = false;
+  offMsg(fail.length ? T("Téléchargement impossible pour {0}. Réessaie plus tard.", [fail.join(', ')]) : T("C'est prêt."), !!fail.length);
+  offChanged(); await offRender();
+}
+async function offDel(files) {
+  for (const f of files) { try { await idbRun('pois', 'readwrite', o => o.delete('pk1|' + f)); } catch (e) {} if (PK.stored) PK.stored.delete(f); PK.blobs.delete(f); }
+  offMsg(T("Supprimé.")); offChanged(); await offRender();
+}
+const offArm = (b, fn) => { if (b.dataset.arm) { clearTimeout(+b.dataset.arm); fn(); return; } const old = b.textContent; b.classList.add('arm'); b.textContent = T("Confirmer ?"); b.dataset.arm = setTimeout(() => { b.classList.remove('arm'); b.textContent = old; delete b.dataset.arm; }, 4000); };
+$('#meOffRows').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'), row = e.target.closest('.off-row'); if (!b || !row) return;
+  const f = row.dataset.f;
+  if (b.dataset.act === 'upd') offGet([f], b); else offArm(b, () => offDel([f]));
+});
+$('#meOffGo').addEventListener('click', e => { const f = $('#meOffSel').value; if (f) offGet([f], e.currentTarget); });
+$('#meOffAll').addEventListener('click', e => offArm(e.currentTarget, async () => { const info = await pkStoredInfo(); offDel([...info.keys()]); }));
+/* ===== Carte hors ligne d'une trace : écran (bouton de la carte, fiche de Mes parcours, liste dans Moi) ===== */
+const OC = { ab: null, busy: '', prog: null, list: [], est: {}, zone: null, zoneOn: false };
+const ocLocked = () => typeof LIM !== 'undefined' && LIM;
+const ocWifi = () => { try { return localStorage.getItem('pmr-pk-wifi') !== '0'; } catch (e) { return true; } };
+async function ocPtsOf(id) {
+  let pts = null;
+  try { const rec = await idbRun('pts', 'readonly', st => st.get(id)); pts = rec && rec.pts; } catch (e) {}
+  if (!pts) { try { const sb = await sbIfLogged(); if (sb) { const { data } = await sb.from('routes').select('pts').eq('user_id', SB_UID).eq('id', id).maybeSingle(); pts = data && data.pts; } } catch (e) {} }
+  return pts && pts.length > 1 ? pts.map(q => ({ lat: q[0], lon: q[1] })) : null;
+}
+async function ocRefresh() { try { OC.list = await ocTraceList(); } catch (e) { OC.list = []; } ocUI(); }
+const ocOf = id => OC.list.find(m => m.id === id);
+async function ocEst(id) { if (OC.est[id] != null) return OC.est[id]; const p = await ocPtsOf(id); OC.est[id] = p ? ocPlan(p).est : 0; return OC.est[id]; }
+function ocStateTxt(id) {
+  if (OC.busy === id && OC.prog) return T("{0} %", [Math.min(99, Math.round(OC.prog.done / Math.max(1, OC.prog.total) * 100))]);
+  if (OC.busy === id) return T("Préparation…");
+  const m = ocOf(id); if (!m) return OC.est[id] ? '~' + pkMo(OC.est[id]) : '';
+  return m.status === 'done' ? T("Gardée · {0}", [pkMo(m.bytes || 0)]) : T("Incomplète · reprendre");
+}
+function ocUI() {
+  const cur = LIB && LIB.current, gb = $('#ocGetBtn');
+  if (gb) {
+    const m = cur && ocOf(cur), busy = cur && OC.busy === cur;
+    gb.classList.toggle('busy', !!busy);
+    gb.textContent = busy ? T("{0} · Annuler", [ocStateTxt(cur)]) : m && m.status === 'done' ? T("Carte gardée ✓") : m ? T("Reprendre la carte hors ligne") : OC.est[cur] ? T("Garder la carte · ~{0}", [pkMo(OC.est[cur])]) : T("Garder la carte");
+  }
+  const d = $('#lpDlg'); if (d && d.open && LP.sheet) { const b = $('#lpDlgOc'); b.querySelector('.r').textContent = ocStateTxt(LP.sheet); b.querySelector('.ocl').textContent = OC.busy === LP.sheet ? T("Annuler le téléchargement") : ocOf(LP.sheet) && ocOf(LP.sheet).status === 'done' ? T("Supprimer la carte hors ligne") : T("Garder la carte hors ligne"); }
+  ocMeRender();
+}
+async function ocStart(id) {
+  if (OC.busy) { toast(T("Un téléchargement est déjà en cours.")); return; }
+  if (ocLocked()) { plusDlg(T("La carte hors ligne d'une trace est réservée à Sillage.cc +.")); return; }
+  const r = LIB.list.find(x => x.id === id), pts = await ocPtsOf(id);
+  if (!pts) { toast(T("Trace introuvable pour ce parcours.")); return; }
+  const cn = navigator.connection;
+  if (ocWifi() && cn && cn.type === 'cellular') { toast(T("Tu es en données mobiles. Décoche « Seulement en Wi-Fi » ou réessaie en Wi-Fi.")); return; }
+  const plan = ocPlan(pts), sp = await ocSpace(); OC.est[id] = plan.est;
+  if (sp && sp.libre < plan.est * 2) { toast(T("Pas assez de place sur l'appareil : il faut environ {0}.", [pkMo(plan.est * 2)])); return; }
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+  OC.ab = new AbortController(); OC.busy = id; OC.prog = null; let wl = null; try { wl = await navigator.wakeLock.request('screen'); } catch (e) {}
+  ocUI();
+  try {
+    const m = await ocDownload(id, pts, { name: r && r.name, signal: OC.ab.signal, onProgress: p => { OC.prog = p; ocUI(); } });
+    toast(m.status === 'done' ? T("Carte hors ligne prête : {0}", [pkMo(m.bytes || 0)]) : T("Téléchargement interrompu : tu peux le reprendre."));
+  } catch (e) { if (!OC.ab.signal.aborted) toast(T("Téléchargement impossible. Réessaie plus tard.")); }
+  finally { OC.busy = ''; OC.ab = null; OC.prog = null; try { wl && wl.release(); } catch (e) {} await ocRefresh(); }
+}
+async function ocAction(id) {
+  if (OC.busy === id) { OC.ab && OC.ab.abort(); return; }
+  const m = ocOf(id);
+  if (m && m.status === 'done') { await ocTraceDelete(id); toast(T("Carte hors ligne supprimée.")); await ocRefresh(); return; }
+  ocStart(id);
+}
+$('#ocGetBtn').addEventListener('click', () => { const id = LIB.current; if (!id) return; const m = ocOf(id); if (m && m.status === 'done') { meOpen(); return; } ocAction(id); });
+// zone hors ligne dessinée sur la carte : 4 bandes de largeur réelle (15, 10, 4 et 1,5 km de chaque côté)
+function ocZoneDraw() {
+  if (OC.zone) { map.removeLayer(OC.zone.g); map.off('zoomend', OC.zone.fn); OC.zone = null; }
+  if (!OC.zoneOn || !map || !S.P) return;
+  const ll = S.P.pts.filter((_, i, a) => i % Math.max(1, Math.floor(a.length / 1500)) === 0).map(p => [p.lat, p.lon]);
+  const g = L.layerGroup(), cols = ['#3e86c0', '#3e86c0', '#3e86c0', '#178a4e'], ops = [0.12, 0.16, 0.22, 0.3], ln = OC_RADII.slice().reverse().map(r => r[1]);   // [15, 10, 4, 1.5]
+  const bands = ln.map((r, i) => L.polyline(ll, { color: cols[i], opacity: ops[i], lineCap: 'round', lineJoin: 'round', interactive: false, weight: 4 }).addTo(g));
+  const fn = () => { const z = map.getZoom(), lat = map.getCenter().lat, mpp = 156543.03 * Math.cos(lat * Math.PI / 180) / 2 ** z; bands.forEach((b, i) => b.setStyle({ weight: Math.max(3, 2 * ln[i] * 1000 / mpp) })); };
+  g.addTo(map); if (routeLayer) routeLayer.bringToFront && routeLayer.bringToFront(); fn(); map.on('zoomend', fn); OC.zone = { g, fn };
+}
+$('#ocZoneBtn').addEventListener('click', () => { OC.zoneOn = !OC.zoneOn; $('#ocZoneBtn').setAttribute('aria-pressed', String(OC.zoneOn)); ocZoneDraw(); if (OC.zoneOn && OC.zone) map.fitBounds(L.polyline(S.P.pts.map(p => [p.lat, p.lon])).getBounds().pad(0.4)); });
+async function ocMeRender() {
+  const box = $('#meOcRows'); if (!box) return;
+  const L2 = OC.list.slice().sort((a, b) => (b.finished || b.created || 0) - (a.finished || a.created || 0));
+  const tot = L2.reduce((s, m) => s + (m.bytes || 0), 0), sp = await ocSpace();
+  $('#meOcSum').textContent = L2.length ? T("{0} trace(s) · {1} sur ton appareil", [L2.length, pkMo(tot)]) + (sp ? T(" · {0} libres", [pkMo(sp.libre)]) : '') : T("Aucune trace gardée hors ligne pour l'instant.");
+  const bar = $('#meOcBar'); bar.hidden = !sp; if (sp) bar.firstElementChild.style.width = Math.min(100, Math.max(1, sp.usage / sp.quota * 100)) + '%';
+  box.innerHTML = L2.map(m => `<div class="pk-row have off-row" data-id="${escH(m.id)}"><span class="pk-cc">▤</span><span class="pk-nm">${escH(m.name || m.id)}<small>${escH(ocStateTxt(m.id))}${m.finished ? ' · ' + escH(new Date(m.finished).toLocaleDateString(LOC, { day: 'numeric', month: 'short' })) : ''}</small></span><span class="off-act">${OC.busy === m.id ? `<button type="button" class="btn small" data-act="stop">${escH(T("Annuler"))}</button>` : `${m.status !== 'done' ? `<button type="button" class="btn small" data-act="go">${escH(T("Reprendre"))}</button>` : ''}<button type="button" class="btn small" data-act="del">${escH(T("Supprimer"))}</button>`}</span></div>`).join('');
+  const w = $('#meOcWifi'); if (w) w.checked = ocWifi();
+}
+$('#meOcRows').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'), row = e.target.closest('.off-row'); if (!b || !row) return; const id = row.dataset.id;
+  if (b.dataset.act === 'stop') OC.ab && OC.ab.abort(); else if (b.dataset.act === 'go') ocStart(id); else offArm(b, async () => { await ocTraceDelete(id); await ocRefresh(); });
+});
+$('#meOcWifi').addEventListener('change', e => { try { localStorage.setItem('pmr-pk-wifi', e.target.checked ? '1' : '0'); } catch (err) {} });
+ocRefresh();
 const pkPm = rows => rows.filter(r => PM_TYPES[r.type]).map(r => ({ src: 'osm', ref: r.id, type: r.type, name: r.name || '', lat: r.lat, lon: r.lon, tags: { ...(r.t || {}), ...(r.name ? { name: r.name } : {}) } }));
 // Page Ultra : portions dont tous les carrés sont couverts par un pack (même logique que poiFromBase).
 /* Villes des graphes du jour lues dans les packs déjà sur l'appareil (19/11/2026) : marche hors ligne.
