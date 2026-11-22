@@ -4211,6 +4211,96 @@ async function pmtOpen(url, signal) {
   };
 }
 
+// ===== Stockage hors ligne (IndexedDB « sillage-offline ») et téléchargement d'un couloir =====
+const OC_R2 = 'https://pub-77808f07935f4974bed44a9e8f2917d0.r2.dev';
+const OC_VER = 'v1';                    // change si le fournisseur / le schéma des tuiles change : les anciennes tuiles ne sont plus lues
+let OC_DB = null;
+function ocDb() {
+  return OC_DB || (OC_DB = new Promise((res, rej) => {
+    const q = indexedDB.open('sillage-offline', 1);
+    q.onupgradeneeded = () => { const d = q.result; d.createObjectStore('tiles', { keyPath: 'k' }); d.createObjectStore('traces', { keyPath: 'id' }); };
+    q.onsuccess = () => res(q.result); q.onerror = () => { OC_DB = null; rej(q.error); };
+  }));
+}
+const ocReq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const ocKey = (z, x, y) => OC_VER + '|' + z + '/' + x + '/' + y;
+async function ocTileGet(z, x, y) { const r = await ocReq((await ocDb()).transaction('tiles').objectStore('tiles').get(ocKey(z, x, y))); return r ? r.d : null; }
+// Range plusieurs tuiles d'un coup (une transaction) et rattache la trace : { clé: Uint8Array | null (absente) }
+async function ocTilesPut(traceId, batch) {
+  const db = await ocDb(), tx = db.transaction('tiles', 'readwrite'), st = tx.objectStore('tiles');
+  await Promise.all(batch.map(async ([k, d]) => {
+    const cur = await ocReq(st.get(k));
+    if (cur) { if (!cur.r.includes(traceId)) { cur.r.push(traceId); st.put(cur); } }
+    else st.put({ k, d, r: [traceId] });
+  }));
+  await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error); });
+}
+async function ocTilesHas(traceId, keys) {         // clés déjà rangées ET rattachées à cette trace (reprise)
+  const st = (await ocDb()).transaction('tiles').objectStore('tiles'), out = new Set();
+  await Promise.all(keys.map(async k => { const c = await ocReq(st.get(k)); if (c && c.r.includes(traceId)) out.add(k); }));
+  return out;
+}
+async function ocTraceSave(m) { const tx = (await ocDb()).transaction('traces', 'readwrite'); tx.objectStore('traces').put(m); await new Promise(r => tx.oncomplete = r); }
+async function ocTraceGet(id) { return ocReq((await ocDb()).transaction('traces').objectStore('traces').get(id)); }
+async function ocTraceList() { return ocReq((await ocDb()).transaction('traces').objectStore('traces').getAll()); }
+// Supprime la trace : ses tuiles ne sont effacées que si aucune autre trace ne les utilise.
+async function ocTraceDelete(id) {
+  const db = await ocDb(), tx = db.transaction(['tiles', 'traces'], 'readwrite'), st = tx.objectStore('tiles');
+  st.openCursor().onsuccess = e => {
+    const c = e.target.result; if (!c) return;
+    const v = c.value, i = v.r.indexOf(id);
+    if (i >= 0) { v.r.splice(i, 1); if (v.r.length) c.update(v); else c.delete(); }
+    c.continue();
+  };
+  tx.objectStore('traces').delete(id);
+  await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error); });
+}
+// Place disponible : { quota, usage, libre } ou null si le navigateur ne sait pas
+async function ocSpace() { try { const e = await navigator.storage.estimate(); return { quota: e.quota, usage: e.usage, libre: e.quota - e.usage }; } catch (_) { return null; } }
+// Index des packs pays sur R2 (6 h en mémoire de session)
+let OC_IDX = null;
+async function ocIndex() {
+  if (OC_IDX && Date.now() - OC_IDX.t < 6 * 3600e3) return OC_IDX.packs;
+  const r = await fetch(OC_R2 + '/tiles/index.json', { cache: 'no-cache' }); if (!r.ok) throw new Error('index HTTP ' + r.status);
+  const packs = (await r.json()).packs.map(p => ({ ...p, area_km2: Math.abs((p.bbox[2] - p.bbox[0]) * (p.bbox[3] - p.bbox[1])) }));
+  OC_IDX = { t: Date.now(), packs }; return packs;
+}
+// Packs dont le rectangle contient le centre de la tuile, du plus petit au plus grand (le plus précis d'abord)
+function ocPacksFor(packs, z, x, y) {
+  const lat = ocTileLat(y + 0.5, z), lon = (x + 0.5) / 2 ** z * 360 - 180;
+  return packs.filter(p => lat >= p.bbox[0] && lat <= p.bbox[2] && lon >= p.bbox[1] && lon <= p.bbox[3]).sort((a, b) => a.area_km2 - b.area_km2);
+}
+// Télécharge le couloir d'une trace. opts : { name, signal, onProgress({done,total,bytes,missing}), parallel }
+// Reprend là où il s'était arrêté. Renvoie le manifeste final.
+async function ocDownload(id, pts, opts = {}) {
+  const plan = ocPlan(pts), packs = await ocIndex(), total = plan.vec.length;
+  const m = (await ocTraceGet(id)) || { id, created: Date.now() };
+  Object.assign(m, { name: opts.name || m.name || id, total, est: plan.est, status: 'downloading', done: 0, bytes: m.bytes || 0, missing: 0 });
+  await ocTraceSave(m);
+  const have = new Set(); for (let i = 0; i < total; i += 400) (await ocTilesHas(id, plan.vec.map(k => OC_VER + '|' + k).slice(i, i + 400))).forEach(k => have.add(k));
+  const todo = plan.vec.filter(k => !have.has(OC_VER + '|' + k)); m.done = total - todo.length;
+  const src = new Map(), openPack = p => { if (!src.has(p.cc)) src.set(p.cc, pmtOpen(OC_R2 + '/' + p.file, opts.signal)); return src.get(p.cc); };
+  let next = 0, buf = [], failed = 0;
+  const flush = async () => { const b = buf; buf = []; if (b.length) { await ocTilesPut(id, b); } m.bytes = (m.bytes || 0); await ocTraceSave(m); opts.onProgress && opts.onProgress({ done: m.done, total, bytes: m.bytes, missing: m.missing }); };
+  const worker = async () => {
+    for (;;) {
+      if (opts.signal && opts.signal.aborted) return;
+      const i = next++; if (i >= todo.length) return;
+      const [z, x, y] = todo[i].split('/').map(Number);
+      let d = null;
+      try { for (const p of ocPacksFor(packs, z, x, y)) { d = await (await openPack(p)).get(z, x, y, opts.signal); if (d) break; } }
+      catch (e) { if (opts.signal && opts.signal.aborted) return; failed++; if (failed > 25) throw e; continue; }
+      if (d) { buf.push([OC_VER + '|' + todo[i], d]); m.bytes += d.byteLength; } else m.missing++;
+      m.done++;
+      if (buf.length >= 50) await flush();
+    }
+  };
+  try { await Promise.all(Array.from({ length: opts.parallel || 4 }, worker)); await flush(); }
+  catch (e) { m.status = 'partial'; await flush(); throw e; }
+  m.status = (opts.signal && opts.signal.aborted) ? 'partial' : (failed ? 'partial' : 'done'); m.finished = Date.now();
+  await ocTraceSave(m); return m;
+}
+
 function sglLoad() {
   if (sglP) return sglP;
   if (!document.querySelector('link[data-sgl]')) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = SGL_CSS; l.dataset.sgl = '1'; document.head.appendChild(l); }
