@@ -1512,6 +1512,10 @@ dialog.lp-dlg::backdrop{background:rgba(20,32,27,.38)}
 .lp-dacts button svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .lp-dacts button .r{margin-left:auto;font-size:13px;font-weight:500;color:var(--muted)}
 .lp-dacts button.danger{color:var(--head)}
+.oc-bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0}
+.oc-bar i{display:block;height:100%;width:0;background:var(--brand);border-radius:99px}
+#ocGetBtn.busy{background:var(--panel);color:var(--ink)}
+#ocZoneBtn[aria-pressed=true]{background:var(--ink);color:var(--panel)}
 .lp-dacts button.danger.arm{background:color-mix(in srgb,var(--head) 12%,var(--panel));border-radius:10px;padding:0 10px}
 .lp-dlg .lp-ren{padding:0;grid-column:auto}
 @media (max-width:700px){
@@ -1953,6 +1957,7 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     <div class="lp-dacts no-guest">
       <button type="button" data-act="ren"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4"/></svg>Renommer</button>
       <button type="button" data-act="rev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M7 17h10M4 4l3 3-3 3M20 14l-3 3 3 3"/></svg>Inverser le sens<span class="r" id="lpDlgRev"></span></button>
+      <button type="button" data-act="oc" id="lpDlgOc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg><span class="ocl">Garder la carte hors ligne</span><span class="r"></span></button>
       <button type="button" data-act="gpx"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exporter le GPX</button>
       <button type="button" data-act="del" class="danger" id="lpDlgDel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Supprimer<span class="r">deux appuis</span></button>
     </div>
@@ -2013,6 +2018,13 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
       </details>
       <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
     </div></div>
+  <div class="me-card no-guest" id="meOcCard"><h3>Cartes de mes traces, hors ligne</h3>
+    <p class="hint">Le fond de carte, le relief et les points utiles à 15 km de chaque trace gardée, de plus en plus détaillés près du tracé. Tu les gardes depuis la carte d'une sortie ou depuis Mes parcours.</p>
+    <p class="hint" id="meOcSum"></p>
+    <div class="oc-bar" id="meOcBar" hidden><i></i></div>
+    <div class="pk-rows" id="meOcRows"></div>
+    <label class="arrows-toggle"><input type="checkbox" id="meOcWifi"> Seulement en Wi-Fi</label>
+    <p class="hint al-msg" id="meOcMsg" aria-live="polite"></p></div>
   <div class="me-card no-guest" id="meOffCard"><h3>Cartes hors ligne</h3>
     <p class="hint">Les points utiles (eau, ravitos, hébergements…) et les villes, gardés sur ton téléphone pays par pays : la Carte et Ultra marchent alors sans réseau.</p>
     <p class="hint" id="meOffSum"></p>
@@ -2281,6 +2293,8 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
         <h2>Carte météo du parcours</h2>
         <button class="btn small" id="mapOptsBtn" type="button" aria-pressed="false">Affichage</button>
         <button class="btn small" id="fsBtn" type="button" title="Afficher la carte en plein écran">Plein écran</button>
+        <button class="btn small no-guest" id="ocZoneBtn" type="button" aria-pressed="false" title="Montre la zone de carte que tu auras sans réseau">Zone hors ligne</button>
+        <button class="btn small primary no-guest" id="ocGetBtn" type="button">Garder la carte</button>
         <button class="btn small" id="exportImg" type="button" title="Image PNG de la carte (vue actuelle) avec le vent, et du profil météo">Exporter l'image</button>
         <label class="arrows-toggle"><input type="checkbox" id="arrowsOn" checked> Flèches de vent</label>
         <label class="arrows-toggle"><input type="checkbox" id="skyOn" checked> Ciel</label>
@@ -3916,6 +3930,7 @@ function trendRender() {
 
 function renderAll(opts, opt) {
   renderSummary(opt); renderMap(); renderChart(); renderTable(); renderOpts(opts, opt); renderHours(); renderPois(); renderPlan(); renderLaps(); renderWeek();
+  try { if (typeof ocZoneDraw === 'function') { ocZoneDraw(); if (LIB.current) { ocEst(LIB.current).then(ocUI); } } } catch (e) {}
 }
 
 function renderSummary(opt) {
@@ -4213,7 +4228,8 @@ async function pmtOpen(url, signal) {
 
 // ===== Stockage hors ligne (IndexedDB « sillage-offline ») et téléchargement d'un couloir =====
 const OC_R2 = 'https://pub-77808f07935f4974bed44a9e8f2917d0.r2.dev';
-const OC_VER = 'v1';                    // change si le fournisseur / le schéma des tuiles change : les anciennes tuiles ne sont plus lues
+const OC_DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+const OC_VER = 'v1';                   // change si le fournisseur / le schéma des tuiles change : les anciennes tuiles ne sont plus lues
 let OC_DB = null;
 function ocDb() {
   return OC_DB || (OC_DB = new Promise((res, rej) => {
@@ -4273,12 +4289,13 @@ function ocPacksFor(packs, z, x, y) {
 // Télécharge le couloir d'une trace. opts : { name, signal, onProgress({done,total,bytes,missing}), parallel }
 // Reprend là où il s'était arrêté. Renvoie le manifeste final.
 async function ocDownload(id, pts, opts = {}) {
-  const plan = ocPlan(pts), packs = await ocIndex(), total = plan.vec.length;
+  const plan = ocPlan(pts), packs = await ocIndex();
+  const all = plan.vec.concat(plan.dem.map(k => 'd/' + k)), total = all.length;   // « d/z/x/y » = tuile de relief
   const m = (await ocTraceGet(id)) || { id, created: Date.now() };
   Object.assign(m, { name: opts.name || m.name || id, total, est: plan.est, status: 'downloading', done: 0, bytes: m.bytes || 0, missing: 0 });
   await ocTraceSave(m);
-  const have = new Set(); for (let i = 0; i < total; i += 400) (await ocTilesHas(id, plan.vec.map(k => OC_VER + '|' + k).slice(i, i + 400))).forEach(k => have.add(k));
-  const todo = plan.vec.filter(k => !have.has(OC_VER + '|' + k)); m.done = total - todo.length;
+  const have = new Set(); for (let i = 0; i < total; i += 400) (await ocTilesHas(id, all.map(k => OC_VER + '|' + k).slice(i, i + 400))).forEach(k => have.add(k));
+  const todo = all.filter(k => !have.has(OC_VER + '|' + k)); m.done = total - todo.length;
   const src = new Map(), openPack = p => { if (!src.has(p.cc)) src.set(p.cc, pmtOpen(OC_R2 + '/' + p.file, opts.signal)); return src.get(p.cc); };
   let next = 0, buf = [], failed = 0;
   const flush = async () => { const b = buf; buf = []; if (b.length) { await ocTilesPut(id, b); } m.bytes = (m.bytes || 0); await ocTraceSave(m); opts.onProgress && opts.onProgress({ done: m.done, total, bytes: m.bytes, missing: m.missing }); };
@@ -4286,16 +4303,22 @@ async function ocDownload(id, pts, opts = {}) {
     for (;;) {
       if (opts.signal && opts.signal.aborted) return;
       const i = next++; if (i >= todo.length) return;
-      const [z, x, y] = todo[i].split('/').map(Number);
+      const isDem = todo[i][0] === 'd', [z, x, y] = (isDem ? todo[i].slice(2) : todo[i]).split('/').map(Number);
       let d = null;
-      try { for (const p of ocPacksFor(packs, z, x, y)) { d = await (await openPack(p)).get(z, x, y, opts.signal); if (d) break; } }
+      try {
+        if (isDem) { const r = await fetch(OC_DEM.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal: opts.signal }); if (r.ok) d = new Uint8Array(await r.arrayBuffer()); else if (r.status !== 404) throw new Error('DEM HTTP ' + r.status); }
+        else for (const p of ocPacksFor(packs, z, x, y)) { d = await (await openPack(p)).get(z, x, y, opts.signal); if (d) break; }
+      }
       catch (e) { if (opts.signal && opts.signal.aborted) return; failed++; if (failed > 25) throw e; continue; }
       if (d) { buf.push([OC_VER + '|' + todo[i], d]); m.bytes += d.byteLength; } else m.missing++;
       m.done++;
       if (buf.length >= 50) await flush();
     }
   };
-  try { await Promise.all(Array.from({ length: opts.parallel || 4 }, worker)); await flush(); }
+  try {
+    await Promise.all(Array.from({ length: opts.parallel || 4 }, worker)); await flush();
+    for (const st of OC_FONTS) for (const rg of OC_GLYPH_RANGES) { if (opts.signal && opts.signal.aborted) break; await ocGlyph(st, rg, opts.signal); }   // polices (communes à toutes les traces)
+  }
   catch (e) { m.status = 'partial'; await flush(); throw e; }
   m.status = (opts.signal && opts.signal.aborted) ? 'partial' : (failed ? 'partial' : 'done'); m.finished = Date.now();
   await ocTraceSave(m); return m;
@@ -4332,6 +4355,16 @@ function ocProtocols() {
       return { data: await r.arrayBuffer() };
     } catch (e) { if (ac.signal.aborted) throw e; return { data: new ArrayBuffer(0) }; }
   });
+  maplibregl.addProtocol('sgld', async (p, ac) => {       // sgld://z/x/y : relief (terrarium), appareil d'abord
+    const [z, x, y] = p.url.slice(7).split('/').map(Number);
+    try { const d = await ocReq((await ocDb()).transaction('tiles').objectStore('tiles').get(OC_VER + '|d/' + z + '/' + x + '/' + y)); if (d && d.d) return { data: d.d.buffer.slice(d.d.byteOffset, d.d.byteOffset + d.d.byteLength) }; } catch (_) {}
+    if (navigator.onLine === false) return { data: new ArrayBuffer(0) };
+    try {
+      const r = await fetch(OC_DEM.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal: ac.signal });
+      if (!r.ok) return { data: new ArrayBuffer(0) };
+      return { data: await r.arrayBuffer() };
+    } catch (e) { if (ac.signal.aborted) throw e; return { data: new ArrayBuffer(0) }; }
+  });
   maplibregl.addProtocol('sglg', async (p, ac) => {       // sglg://<police>/<plage>.pbf : polices
     const m = /^sglg:\/\/(.+)\/([^/]+)\.pbf$/.exec(p.url); if (!m) throw new Error('police ?');
     const d = await ocGlyph(decodeURIComponent(m[1]), m[2], ac.signal);
@@ -4360,7 +4393,7 @@ function sglStyle(p) {
     version: 8, glyphs: 'sglg://{fontstack}/{range}.pbf',
     sources: {
       om: { type: 'vector', tiles: ['sglo://{z}/{x}/{y}'], minzoom: 0, maxzoom: 14 },
-      dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 13 }
+      dem: { type: 'raster-dem', tiles: ['sgld://{z}/{x}/{y}'], encoding: 'terrarium', tileSize: 256, maxzoom: 11 }
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': p.bg } },
@@ -9126,6 +9159,7 @@ $('#lpDlg').addEventListener('click', async e => {
   if (act === 'ren') { LP.ren = id; lpSheetFill(); return; }
   if (act === 'rev') { const rev = !revGet(id); revSet(id, rev); if (id === LIB.current && S.fwd) { try { loadRoute(S.fwd, S.baseName, rev); } catch (err) { setStatus(err.message, 'err'); } } lpSheetFill(); return; }
   if (act === 'gpx') { lpGpx(id); return; }
+  if (act === 'oc') { ocAction(id); return; }
   if (act === 'del') {
     if (LP.del !== id) { LP.del = id; clearTimeout(LP.delT); LP.delT = setTimeout(() => { LP.del = ''; if ($('#lpDlg').open) lpSheetFill(); }, 4000); lpSheetFill(); return; }
     clearTimeout(LP.delT); LP.del = ''; const t = lpThumbs(); delete t[id]; try { localStorage.setItem('pmr-thumbs', JSON.stringify(t)); } catch (err) {}
@@ -9334,7 +9368,7 @@ function meRender() {
   $('#meVMotion').textContent = seg('meMotion'); $('#meVFont').textContent = seg('meFont').replace(/\s*\(.*\)/, '');
   meTafSel();
 }
-function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); }
+function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); }
 const ME_STEP = { speed: [12, 40, 0.5], vam: [300, 1400, 50], pmin: [0, 30, 1] };
 function meModesRender() {
   const m = ME.mode, g = meGet(m), fmt = { speed: v => fV(+v, 1) + ' ' + UL.kmh, vam: v => fE(+v) + ' ' + UL.mh, pmin: v => v + ' min' };
@@ -10012,6 +10046,86 @@ $('#meOffRows').addEventListener('click', e => {
 });
 $('#meOffGo').addEventListener('click', e => { const f = $('#meOffSel').value; if (f) offGet([f], e.currentTarget); });
 $('#meOffAll').addEventListener('click', e => offArm(e.currentTarget, async () => { const info = await pkStoredInfo(); offDel([...info.keys()]); }));
+/* ===== Carte hors ligne d'une trace : écran (bouton de la carte, fiche de Mes parcours, liste dans Moi) ===== */
+const OC = { ab: null, busy: '', prog: null, list: [], est: {}, zone: null, zoneOn: false };
+const ocLocked = () => typeof LIM !== 'undefined' && LIM;
+const ocWifi = () => { try { return localStorage.getItem('pmr-pk-wifi') !== '0'; } catch (e) { return true; } };
+async function ocPtsOf(id) {
+  let pts = null;
+  try { const rec = await idbRun('pts', 'readonly', st => st.get(id)); pts = rec && rec.pts; } catch (e) {}
+  if (!pts) { try { const sb = await sbIfLogged(); if (sb) { const { data } = await sb.from('routes').select('pts').eq('user_id', SB_UID).eq('id', id).maybeSingle(); pts = data && data.pts; } } catch (e) {} }
+  return pts && pts.length > 1 ? pts.map(q => ({ lat: q[0], lon: q[1] })) : null;
+}
+async function ocRefresh() { try { OC.list = await ocTraceList(); } catch (e) { OC.list = []; } ocUI(); }
+const ocOf = id => OC.list.find(m => m.id === id);
+async function ocEst(id) { if (OC.est[id] != null) return OC.est[id]; const p = await ocPtsOf(id); OC.est[id] = p ? ocPlan(p).est : 0; return OC.est[id]; }
+function ocStateTxt(id) {
+  if (OC.busy === id && OC.prog) return T("{0} %", [Math.min(99, Math.round(OC.prog.done / Math.max(1, OC.prog.total) * 100))]);
+  if (OC.busy === id) return T("Préparation…");
+  const m = ocOf(id); if (!m) return OC.est[id] ? '~' + pkMo(OC.est[id]) : '';
+  return m.status === 'done' ? T("Gardée · {0}", [pkMo(m.bytes || 0)]) : T("Incomplète · reprendre");
+}
+function ocUI() {
+  const cur = LIB && LIB.current, gb = $('#ocGetBtn');
+  if (gb) {
+    const m = cur && ocOf(cur), busy = cur && OC.busy === cur;
+    gb.classList.toggle('busy', !!busy);
+    gb.textContent = busy ? T("{0} · Annuler", [ocStateTxt(cur)]) : m && m.status === 'done' ? T("Carte gardée ✓") : m ? T("Reprendre la carte hors ligne") : OC.est[cur] ? T("Garder la carte · ~{0}", [pkMo(OC.est[cur])]) : T("Garder la carte");
+  }
+  const d = $('#lpDlg'); if (d && d.open && LP.sheet) { const b = $('#lpDlgOc'); b.querySelector('.r').textContent = ocStateTxt(LP.sheet); b.querySelector('.ocl').textContent = OC.busy === LP.sheet ? T("Annuler le téléchargement") : ocOf(LP.sheet) && ocOf(LP.sheet).status === 'done' ? T("Supprimer la carte hors ligne") : T("Garder la carte hors ligne"); }
+  ocMeRender();
+}
+async function ocStart(id) {
+  if (OC.busy) { toast(T("Un téléchargement est déjà en cours.")); return; }
+  if (ocLocked()) { plusDlg(T("La carte hors ligne d'une trace est réservée à Sillage.cc +.")); return; }
+  const r = LIB.list.find(x => x.id === id), pts = await ocPtsOf(id);
+  if (!pts) { toast(T("Trace introuvable pour ce parcours.")); return; }
+  const cn = navigator.connection;
+  if (ocWifi() && cn && cn.type === 'cellular') { toast(T("Tu es en données mobiles. Décoche « Seulement en Wi-Fi » ou réessaie en Wi-Fi.")); return; }
+  const plan = ocPlan(pts), sp = await ocSpace(); OC.est[id] = plan.est;
+  if (sp && sp.libre < plan.est * 2) { toast(T("Pas assez de place sur l'appareil : il faut environ {0}.", [pkMo(plan.est * 2)])); return; }
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+  OC.ab = new AbortController(); OC.busy = id; OC.prog = null; let wl = null; try { wl = await navigator.wakeLock.request('screen'); } catch (e) {}
+  ocUI();
+  try {
+    const m = await ocDownload(id, pts, { name: r && r.name, signal: OC.ab.signal, onProgress: p => { OC.prog = p; ocUI(); } });
+    toast(m.status === 'done' ? T("Carte hors ligne prête : {0}", [pkMo(m.bytes || 0)]) : T("Téléchargement interrompu : tu peux le reprendre."));
+  } catch (e) { if (!OC.ab.signal.aborted) toast(T("Téléchargement impossible. Réessaie plus tard.")); }
+  finally { OC.busy = ''; OC.ab = null; OC.prog = null; try { wl && wl.release(); } catch (e) {} await ocRefresh(); }
+}
+async function ocAction(id) {
+  if (OC.busy === id) { OC.ab && OC.ab.abort(); return; }
+  const m = ocOf(id);
+  if (m && m.status === 'done') { await ocTraceDelete(id); toast(T("Carte hors ligne supprimée.")); await ocRefresh(); return; }
+  ocStart(id);
+}
+$('#ocGetBtn').addEventListener('click', () => { const id = LIB.current; if (!id) return; const m = ocOf(id); if (m && m.status === 'done') { meOpen(); return; } ocAction(id); });
+// zone hors ligne dessinée sur la carte : 4 bandes de largeur réelle (15, 10, 4 et 1,5 km de chaque côté)
+function ocZoneDraw() {
+  if (OC.zone) { map.removeLayer(OC.zone.g); map.off('zoomend', OC.zone.fn); OC.zone = null; }
+  if (!OC.zoneOn || !map || !S.P) return;
+  const ll = S.P.pts.filter((_, i, a) => i % Math.max(1, Math.floor(a.length / 1500)) === 0).map(p => [p.lat, p.lon]);
+  const g = L.layerGroup(), cols = ['#3e86c0', '#3e86c0', '#3e86c0', '#178a4e'], ops = [0.12, 0.16, 0.22, 0.3], ln = OC_RADII.slice().reverse().map(r => r[1]);   // [15, 10, 4, 1.5]
+  const bands = ln.map((r, i) => L.polyline(ll, { color: cols[i], opacity: ops[i], lineCap: 'round', lineJoin: 'round', interactive: false, weight: 4 }).addTo(g));
+  const fn = () => { const z = map.getZoom(), lat = map.getCenter().lat, mpp = 156543.03 * Math.cos(lat * Math.PI / 180) / 2 ** z; bands.forEach((b, i) => b.setStyle({ weight: Math.max(3, 2 * ln[i] * 1000 / mpp) })); };
+  g.addTo(map); if (routeLayer) routeLayer.bringToFront && routeLayer.bringToFront(); fn(); map.on('zoomend', fn); OC.zone = { g, fn };
+}
+$('#ocZoneBtn').addEventListener('click', () => { OC.zoneOn = !OC.zoneOn; $('#ocZoneBtn').setAttribute('aria-pressed', String(OC.zoneOn)); ocZoneDraw(); if (OC.zoneOn && OC.zone) map.fitBounds(L.polyline(S.P.pts.map(p => [p.lat, p.lon])).getBounds().pad(0.4)); });
+async function ocMeRender() {
+  const box = $('#meOcRows'); if (!box) return;
+  const L2 = OC.list.slice().sort((a, b) => (b.finished || b.created || 0) - (a.finished || a.created || 0));
+  const tot = L2.reduce((s, m) => s + (m.bytes || 0), 0), sp = await ocSpace();
+  $('#meOcSum').textContent = L2.length ? T("{0} trace(s) · {1} sur ton appareil", [L2.length, pkMo(tot)]) + (sp ? T(" · {0} libres", [pkMo(sp.libre)]) : '') : T("Aucune trace gardée hors ligne pour l'instant.");
+  const bar = $('#meOcBar'); bar.hidden = !sp; if (sp) bar.firstElementChild.style.width = Math.min(100, Math.max(1, sp.usage / sp.quota * 100)) + '%';
+  box.innerHTML = L2.map(m => `<div class="pk-row have off-row" data-id="${escH(m.id)}"><span class="pk-cc">▤</span><span class="pk-nm">${escH(m.name || m.id)}<small>${escH(ocStateTxt(m.id))}${m.finished ? ' · ' + escH(new Date(m.finished).toLocaleDateString(LOC, { day: 'numeric', month: 'short' })) : ''}</small></span><span class="off-act">${OC.busy === m.id ? `<button type="button" class="btn small" data-act="stop">${escH(T("Annuler"))}</button>` : `${m.status !== 'done' ? `<button type="button" class="btn small" data-act="go">${escH(T("Reprendre"))}</button>` : ''}<button type="button" class="btn small" data-act="del">${escH(T("Supprimer"))}</button>`}</span></div>`).join('');
+  const w = $('#meOcWifi'); if (w) w.checked = ocWifi();
+}
+$('#meOcRows').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'), row = e.target.closest('.off-row'); if (!b || !row) return; const id = row.dataset.id;
+  if (b.dataset.act === 'stop') OC.ab && OC.ab.abort(); else if (b.dataset.act === 'go') ocStart(id); else offArm(b, async () => { await ocTraceDelete(id); await ocRefresh(); });
+});
+$('#meOcWifi').addEventListener('change', e => { try { localStorage.setItem('pmr-pk-wifi', e.target.checked ? '1' : '0'); } catch (err) {} });
+ocRefresh();
 const pkPm = rows => rows.filter(r => PM_TYPES[r.type]).map(r => ({ src: 'osm', ref: r.id, type: r.type, name: r.name || '', lat: r.lat, lon: r.lon, tags: { ...(r.t || {}), ...(r.name ? { name: r.name } : {}) } }));
 // Page Ultra : portions dont tous les carrés sont couverts par un pack (même logique que poiFromBase).
 /* Villes des graphes du jour lues dans les packs déjà sur l'appareil (19/11/2026) : marche hors ligne.
