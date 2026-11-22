@@ -4144,6 +4144,73 @@ function ocPlan(pts) {
   return { vec, dem, est };
 }
 
+// ===== Lecteur PMTiles v3 (lecture par morceaux HTTP Range) =====
+function pmtZxyToId(z, x, y) {
+  if (z === 0) return 0;
+  let acc = 0; for (let t = 0; t < z; t++) acc += 4 ** t;
+  const n = 2 ** z; let d = 0;
+  for (let s = n / 2; s > 0; s = Math.floor(s / 2)) {
+    const rx = (x & s) > 0 ? 1 : 0, ry = (y & s) > 0 ? 1 : 0;
+    d += s * s * ((3 * rx) ^ ry);
+    if (ry === 0) { if (rx === 1) { x = n - 1 - x; y = n - 1 - y; } const t = x; x = y; y = t; }
+  }
+  return acc + d;
+}
+async function pmtGunzip(buf) {
+  const ds = new DecompressionStream('gzip');
+  return new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer());
+}
+async function pmtRange(url, off, len, signal) {
+  const r = await fetch(url, { headers: { Range: 'bytes=' + off + '-' + (off + len - 1) }, signal });
+  if (r.status !== 206 && r.status !== 200) throw new Error('HTTP ' + r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  return r.status === 200 ? b.slice(off, off + len) : b;
+}
+function pmtHeader(b) {
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength), u = o => Number(dv.getBigUint64(o, true));
+  if (String.fromCharCode(...b.slice(0, 7)) !== 'PMTiles' || b[7] !== 3) throw new Error('pas un PMTiles v3');
+  return { rootOff: u(8), rootLen: u(16), leafOff: u(40), dataOff: u(56), intComp: b[97], tileComp: b[98], minZ: b[100], maxZ: b[101] };
+}
+function pmtDir(b) {
+  let p = 0;
+  const vi = () => { let r = 0, s = 0, c; do { c = b[p++]; r += (c & 127) * 2 ** s; s += 7; } while (c & 128); return r; };
+  const n = vi(), e = new Array(n);
+  let id = 0;
+  for (let i = 0; i < n; i++) { id += vi(); e[i] = { id, run: 0, len: 0, off: 0 }; }
+  for (let i = 0; i < n; i++) e[i].run = vi();
+  for (let i = 0; i < n; i++) e[i].len = vi();
+  for (let i = 0; i < n; i++) { const v = vi(); e[i].off = v === 0 && i > 0 ? e[i - 1].off + e[i - 1].len : v - 1; }
+  return e;
+}
+function pmtFind(es, id) {
+  let lo = 0, hi = es.length - 1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (es[m].id <= id) lo = m + 1; else hi = m - 1; }
+  if (hi < 0) return null;
+  const e = es[hi];
+  if (e.run === 0) return e;                // pointe vers un répertoire de feuilles
+  return id - e.id < e.run ? e : null;
+}
+// Ouvre un PMTiles distant : { get(z,x,y) -> Uint8Array décompressé | null, header }
+async function pmtOpen(url, signal) {
+  const head = await pmtRange(url, 0, 16384, signal), h = pmtHeader(head);
+  const unz = async (b, c) => c === 2 ? pmtGunzip(b) : b;
+  const root = pmtDir(await unz(head.slice(h.rootOff, h.rootOff + h.rootLen), h.intComp));
+  const leaves = new Map();
+  return {
+    header: h,
+    async get(z, x, y, sig) {
+      const id = pmtZxyToId(z, x, y); let es = root;
+      for (let d = 0; d < 4; d++) {
+        const e = pmtFind(es, id); if (!e) return null;
+        if (e.run > 0) return unz(await pmtRange(url, h.dataOff + e.off, e.len, sig), h.tileComp);
+        const k = e.off; if (!leaves.has(k)) leaves.set(k, pmtDir(await unz(await pmtRange(url, h.leafOff + e.off, e.len, sig), h.intComp)));
+        es = leaves.get(k);
+      }
+      return null;
+    }
+  };
+}
+
 function sglLoad() {
   if (sglP) return sglP;
   if (!document.querySelector('link[data-sgl]')) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = SGL_CSS; l.dataset.sgl = '1'; document.head.appendChild(l); }
