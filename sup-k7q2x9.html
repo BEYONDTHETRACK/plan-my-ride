@@ -282,6 +282,12 @@ dialog h2{margin-bottom:6px}
 }
 /* Points et avis (essai du 31/10/2026) */
 .tabs .cnt{display:inline-block;min-width:20px;padding:1px 7px;margin-left:6px;border-radius:999px;background:var(--brand);color:#14201b;font-family:var(--f-mono);font-size:12px;font-weight:600;text-align:center}
+.okpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:4px 0 14px}
+@media (max-width:900px){.okpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.osmrank td{padding:11px 12px;border-top:1px solid var(--line-2)}
+.osmrank .top td{font-weight:700}
+.osmrank .pos{color:var(--ok);font-weight:600}.osmrank .neg{color:var(--bad)}
+@media (max-width:700px){.osmrank th:nth-child(5),.osmrank td:nth-child(5){display:none}}
 .pkpis{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:700px){.pkpis{grid-template-columns:1fr}}
 .pbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
@@ -461,6 +467,12 @@ dialog h2{margin-bottom:6px}
     <div id="poi" hidden style="display:flex;flex-direction:column;gap:18px">
       <p class="msg" style="margin:0;font-size:15px">Tout ce que les cyclistes ajoutent est visible tout de suite sur la carte de l'app, avec la mention « en cours de validation ». Tu valides ou tu retires quand tu as le temps.</p>
       <section class="kpis pkpis" id="pKpis" aria-label="À traiter"></section>
+      <section class="card" id="pOsm" aria-labelledby="h-osm">
+        <div class="ch"><h2 id="h-osm">Points OpenStreetMap vérifiés par les cyclistes</h2><div class="pchips" id="pOsmP" role="group" aria-label="Période"></div></div>
+        <section class="kpis okpis" id="pOsmK" aria-label="Vérifications"></section>
+        <div style="overflow-x:auto"><table class="osmrank"><thead><tr><th class="num" style="width:44px">#</th><th>Cycliste</th><th class="num">« Toujours là »</th><th class="num">« Disparu »</th><th class="num">Points</th><th class="num">Dernière</th></tr></thead><tbody id="pOsmB"></tbody></table></div>
+        <p class="muted" id="pOsmN" style="font-size:13px;margin:8px 0 0"></p>
+      </section>
       <div class="pbar"><div class="seg" id="pSub" role="group" aria-label="Contenu"><button type="button" data-sub="points" aria-pressed="true">Points</button><button type="button" data-sub="reviews" aria-pressed="false">Avis</button></div><div class="pchips" id="pFilters" role="group" aria-label="Filtre"></div></div>
       <p class="msg err" id="pMsg" aria-live="polite" style="margin:0"></p>
       <ul class="plist" id="pList"></ul>
@@ -1096,7 +1108,7 @@ const PT = {
   atelier: ['Atelier vélo', '#d2337e', 'M14.5 5.5a4 4 0 0 0 4 4L10 18a2.1 2.1 0 0 1-3-3l8.5-8.5M17 3l4 4'],
   recharge: ['Recharge', '#1a9696', 'M4 7h13a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 17 17H4a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 4 7zM21.5 10.5v3M11.5 9 8.5 12.2h4L9.5 15']
 };
-const P = { pois: [], revs: [], sub: 'points', filter: 'pending', dup: {}, choice: {}, pick: {}, ask: '', loaded: false, err: '', q: [], busy: false };
+const P = { checks: [], osmP: 'all', pois: [], revs: [], sub: 'points', filter: 'pending', dup: {}, choice: {}, pick: {}, ask: '', loaded: false, err: '', q: [], busy: false };
 const PHOTO = SUPABASE_URL + '/storage/v1/object/public/poi-photos/';
 const pSvg = d => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + d + '"/></svg>';
 const pAgo = iso => { const s = (Date.now() - new Date(iso)) / 1000; return s < 3600 ? 'il y a ' + Math.max(1, Math.round(s / 60)) + ' min' : s < 86400 ? 'il y a ' + Math.round(s / 3600) + ' h' : s < 86400 * 30 ? 'il y a ' + Math.round(s / 86400) + ' j' : new Date(iso).toLocaleDateString('fr-FR'); };
@@ -1120,17 +1132,57 @@ function pKind(t) {
   return K[t.amenity] || K[t.shop] || K[t.tourism] || (t.man_made === 'water_tap' ? "Robinet d'eau potable" : '');
 }
 async function pLoad() {
-  const [a, b] = await Promise.all([
+  const [a, b, c] = await Promise.all([
     sb.from('poi').select('*').order('created_at', { ascending: false }).limit(1000),
-    sb.from('poi_review').select('*').order('created_at', { ascending: false }).limit(1000)
+    sb.from('poi_review').select('*').order('created_at', { ascending: false }).limit(1000),
+    pChecksLoad()
   ]);
   if (a.error || b.error) { P.err = (a.error || b.error).message; P.pois = []; P.revs = []; }
   else { P.err = ''; P.pois = a.data || []; P.revs = b.data || []; }
+  P.checks = c.error ? [] : (c.data || []);
   // au premier chargement, ouvrir sur ce qui attend : les avis s'il n'y a aucun point à valider (03/11/2026)
   if (!P.loaded && P.sub === 'points' && !P.pois.some(p => p.status === 'pending') && P.revs.some(r => r.status === 'pending')) P.sub = 'reviews';
   P.loaded = true; pBadge(); if (S.tab === 'poi') pRender();
   for (const p of P.pois) if (p.status === 'pending' && !P.dup[p.id]) { P.dup[p.id] = { state: 'wait', list: [] }; P.q.push(p); }
   pDupPump();
+}
+// « Toujours là ? » (poi_check) : lu par pages de 1000 (limite de l'API), les admins lisent tout (politique poi_check_own).
+async function pChecksLoad() {
+  let all = [];
+  for (let i = 0; i < 20; i++) {
+    const r = await sb.from('poi_check').select('poi_key,user_id,ok,at').order('at', { ascending: false }).range(i * 1000, i * 1000 + 999);
+    if (r.error) return { error: r.error };
+    all = all.concat(r.data || []);
+    if ((r.data || []).length < 1000) break;
+  }
+  return { data: all };
+}
+// Points OSM vérifiés : même règle que l'app (poi_verified) : « Oui, toujours là » + avis validés sur 12 mois plus nombreux que les « Non, disparu ».
+function pOsmStats() {
+  const days = P.osmP === 'all' ? 0 : +P.osmP, since = days ? Date.now() - days * 864e5 : 0;
+  const y = Date.now() - 365 * 864e5;
+  const osm = c => !/^p:/.test(c.poi_key);
+  const inP = c => !since || new Date(c.at).getTime() >= since;
+  const ev = {};
+  for (const c of P.checks) if (osm(c) && new Date(c.at).getTime() > y) { const e = ev[c.poi_key] || (ev[c.poi_key] = { ok: 0, ko: 0 }); c.ok ? e.ok++ : e.ko++; }
+  for (const r of P.revs) if (r.status === 'valid' && !/^p:/.test(r.poi_key) && new Date(r.created_at).getTime() > y) { const e = ev[r.poi_key] || (ev[r.poi_key] = { ok: 0, ko: 0 }); e.ok++; }
+  const verified = Object.values(ev).filter(e => e.ok > e.ko).length;
+  const rows = P.checks.filter(c => osm(c) && inP(c));
+  const by = {};
+  for (const c of rows) { const u = by[c.user_id] || (by[c.user_id] = { id: c.user_id, ok: 0, ko: 0, keys: new Set(), last: '' }); c.ok ? u.ok++ : u.ko++; u.keys.add(c.poi_key); if (c.at > u.last) u.last = c.at; }
+  const rank = Object.values(by).sort((a, b) => (b.ok + b.ko) - (a.ok + a.ko) || b.keys.size - a.keys.size || (a.last < b.last ? 1 : -1));
+  return { verified, ok: rows.filter(c => c.ok).length, ko: rows.filter(c => !c.ok).length, points: new Set(rows.map(c => c.poi_key)).size, rank, total: P.checks.filter(osm).length };
+}
+function pOsmRender() {
+  if (!$('pOsm')) return;
+  const PER = [['all', 'Depuis le début'], ['30', '30 jours'], ['7', '7 jours']];
+  $('pOsmP').innerHTML = PER.map(([v, l]) => '<button type="button" class="chip" data-osmp="' + v + '" aria-pressed="' + (P.osmP === v) + '">' + l + '</button>').join('');
+  const st = pOsmStats();
+  const k = (l, v, sub) => '<div class="kpi"><div class="l">' + l + '</div><div class="v">' + v + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
+  $('pOsmK').innerHTML = k('Points OSM vérifiés', st.verified, 'au total, sur 12 mois') + k('Points touchés', st.points, 'confirmés ou signalés') + k('« Toujours là »', st.ok, '') + k('« Disparu »', st.ko, '');
+  $('pOsmB').innerHTML = st.rank.length ? st.rank.map((u, i) => '<tr' + (i < 3 ? ' class="top"' : '') + '><td class="num">' + (i + 1) + '</td><td>' + esc(short(byId(u.id))) + '</td><td class="num pos">' + u.ok + '</td><td class="num' + (u.ko ? ' neg' : '') + '">' + u.ko + '</td><td class="num">' + u.keys.size + '</td><td class="num">' + esc(ago(u.last)) + '</td></tr>').join('')
+    : '<tr><td colspan="6" class="muted" style="padding:14px">Aucune vérification sur cette période.</td></tr>';
+  $('pOsmN').textContent = st.total + ' vérification' + (st.total > 1 ? 's' : '') + ' en tout. Un point devient « vérifié » quand ses « Toujours là » (et avis validés) dépassent ses « Disparu ».';
 }
 function pBadge() {
   const n = P.pois.filter(p => p.status === 'pending').length + P.revs.filter(r => r.status === 'pending').length;
@@ -1271,6 +1323,7 @@ function pRender() {
   if (P.err) { $('pList').innerHTML = '<li class="msg err">Lecture impossible : ' + esc(P.err) + (/relation|does not exist|schema cache/i.test(P.err) ? ' — le script supabase/sql/2026-10-31_poi.sql n\'est pas encore appliqué.' : '') + '</li>'; return; }
   const pp = P.pois.filter(p => p.status === 'pending').length, pr = P.revs.filter(r => r.status === 'pending').length, rep = P.revs.filter(r => r.reports > 0 && r.status !== 'removed').length;
   const k = (l, v, cls) => '<div class="kpi"><div class="l">' + l + '</div><div class="v"' + (cls ? ' style="color:var(--bad)"' : '') + '>' + v + '</div></div>';
+  pOsmRender();
   $('pKpis').innerHTML = k('Points à valider', pp) + k('Avis à valider', pr) + k('Avis signalés', rep, rep > 0);
   for (const b of $('pSub').querySelectorAll('[data-sub]')) b.setAttribute('aria-pressed', String(b.dataset.sub === P.sub));
   const F = [['pending', 'À valider'], ['valid', 'Validés'], ['removed', 'Retirés'], ['all', 'Tout']].concat(P.sub === 'reviews' ? [['reported', 'Signalés']] : []);
@@ -1334,6 +1387,7 @@ $('pList').addEventListener('click', async e => {
   }
 });
 $('pSub').addEventListener('click', e => { const b = e.target.closest('[data-sub]'); if (!b) return; P.sub = b.dataset.sub; P.ask = ''; pRender(); });
+$('pOsmP').addEventListener('click', e => { const b = e.target.closest('[data-osmp]'); if (!b) return; P.osmP = b.dataset.osmp; pOsmRender(); });
 $('pFilters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; P.filter = b.dataset.f; P.ask = ''; pRender(); });
 
 /* ---------- onglets ---------- */
