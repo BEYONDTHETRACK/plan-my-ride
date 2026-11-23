@@ -10294,21 +10294,24 @@ function pmRender() {
   PM.layer.clearLayers();
   const b = PM.map.getBounds().pad(0.1), replaced = new Set(), cnt = {};
   let nO = 0, nU = 0, nV = 0;
+  const verOn = PM.src.usr; // les points OpenStreetMap confirmés « toujours là » par les cyclistes comptent dans « Par les cyclistes » (23/11/2026)
   const usr = [...PM.usr.values()];
   for (const it of usr) if (it.poi.osm_ref && it.poi.status === 'valid') replaced.add(it.poi.osm_ref);
-  if (PM.src.osm && PM.map.getZoom() >= PM_MINZ - 1) {
+  if ((PM.src.osm || verOn) && PM.map.getZoom() >= PM_MINZ - 1) {
     let shown = 0; PM.cap = false;
     for (const it of PM.osm.values()) {
       if (replaced.has(it.ref) || !b.contains([it.lat, it.lon])) continue;
+      const isV = PM.ver.has(it.ref);
+      if (isV ? !verOn : !PM.src.osm) continue;
       cnt[it.type] = (cnt[it.type] || 0) + 1;
       if (!PM.on.has(it.type)) continue;
       if (shown >= PM_MAX_OSM) { PM.cap = true; continue; }
-      if (PM.ver.has(it.ref)) nV++;
-      L.marker([it.lat, it.lon], { icon: pmIcon(it), keyboard: true, title: (it.name || pmKind(it.tags) || PM_TYPES[it.type].lbl) + ' · OpenStreetMap' + (PM.ver.has(it.ref) ? ' · ' + T("vérifié par les cyclistes") : ''), riseOnHover: true })
+      if (isV) nV++;
+      L.marker([it.lat, it.lon], { icon: pmIcon(it), keyboard: true, zIndexOffset: isV ? 300 : 0, title: (it.name || pmKind(it.tags) || PM_TYPES[it.type].lbl) + ' · OpenStreetMap' + (PM.ver.has(it.ref) ? ' · ' + T("vérifié par les cyclistes") : ''), riseOnHover: true })
         .on('click', () => pmShow(it)).addTo(PM.layer);
       shown++;
     }
-    nO = shown;
+    nO = shown - nV;
   }
   if (PM.src.usr) for (const it of usr) {
     if (!b.contains([it.lat, it.lon])) continue;
@@ -10318,8 +10321,8 @@ function pmRender() {
       .on('click', () => pmShow(it)).addTo(PM.layer);
     nU++;
   }
-  $('#pmCntOsm').textContent = PM.map.getZoom() < PM_MINZ ? T("zoome pour les voir") : nV ? T("{0} points · dont {1} vérifié(s) ✓", [nO, nV]) : T("{0} points · données libres", [nO]);
-  $('#pmCntUsr').textContent = T("{0} points · avis et photos", [nU]);
+  $('#pmCntOsm').textContent = PM.map.getZoom() < PM_MINZ ? T("zoome pour les voir") : T("{0} points · données libres", [nO]);
+  $('#pmCntUsr').textContent = nV ? T("{0} points · dont {1} confirmé(s) ✓", [nU + nV, nV]) : T("{0} points · avis et photos", [nU]);
   const showCnt = PM.map.getZoom() >= PM_MINZ;
   for (const el of document.querySelectorAll('#pmChips [data-k]')) {
     const n = cnt[el.dataset.k] || 0; el.classList.toggle('pm-cnt', showCnt);

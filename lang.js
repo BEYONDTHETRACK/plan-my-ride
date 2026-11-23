@@ -1239,6 +1239,7 @@ window.PMR_I18N = {
     "Recentrer sur mon parcours": "Back to my route",
     "vérifié par les cyclistes": "checked by cyclists",
     "{0} points · dont {1} vérifié(s) ✓": "{0} places · {1} checked ✓",
+    "{0} points · dont {1} confirmé(s) ✓": "{0} places · {1} confirmed ✓",
     "Vérifié par les cyclistes": "Checked by cyclists",
     "Toi": "You",
     "Pain": "Bakery",
