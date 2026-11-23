@@ -1166,6 +1166,8 @@ body.pm-placing .pm-loc{bottom:16px}
 .pm-ver svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .pm-pin.pend::after{content:"";position:absolute;right:-3px;top:-3px;width:10px;height:10px;border-radius:999px;background:var(--brand);border:2px solid #fff}
 .pm-icon{background:none;border:0}
+.pm-clu{display:flex;align-items:center;justify-content:center;width:100%;height:100%;box-sizing:border-box;border-radius:999px;background:var(--ink);color:var(--bg);border:3px solid var(--panel);font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(20,32,27,.35)}
+.pm-clu.usr{background:var(--brand);color:var(--brand-ink)}
 .pm-sheet{position:absolute;left:0;right:0;bottom:0;z-index:6;max-height:78%;overflow:auto;overscroll-behavior:contain;background:var(--panel);border-top:1px solid var(--line);border-radius:22px 22px 0 0;box-shadow:0 -6px 24px rgba(20,32,27,.12);padding:10px 16px 20px}
 .pm-sheet[hidden]{display:none}
 @media (min-width:701px){.pm-sheet{left:auto;right:16px;bottom:auto;top:16px;width:400px;max-height:calc(100% - 32px);border:1px solid var(--line);border-radius:18px}}
@@ -10302,11 +10304,38 @@ function pmIcon(it) {
   return L.divIcon({ className: 'pm-icon', iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2],
     html: `<span class="pm-pin ${u ? 'usr' : 'osm'}${u && it.poi.status === 'pending' ? ' pend' : ''}${!u && PM.ver.has(it.ref) ? ' ver' : ''}" style="--c:${t.col}">${pmSvg(t.d)}</span>` });
 }
+/* Regroupement (23/11/2026) : sous le zoom PM_CLU, les points proches (même case de 54 px à l'écran) deviennent une pastille
+   avec leur nombre ; un clic zoome dessus. Au-dessus, chaque point est posé seul. Les cases suivent l'écran, donc la rotation ne gêne pas. */
+const PM_CLU = 16, PM_CELL = 54;
+function pmDraw(draw) {
+  const map = PM.map, z = map.getZoom(), cells = new Map();
+  if (z >= PM_CLU) { for (const d of draw) cells.set(d, [d]); }
+  else for (const d of draw) {
+    const pt = map.latLngToContainerPoint([d.it.lat, d.it.lon]), k = Math.floor(pt.x / PM_CELL) + ':' + Math.floor(pt.y / PM_CELL);
+    (cells.get(k) || cells.set(k, []).get(k)).push(d);
+  }
+  for (const g of cells.values()) {
+    if (g.length === 1) {
+      const d = g[0];
+      L.marker([d.it.lat, d.it.lon], { icon: pmIcon(d.it), keyboard: true, zIndexOffset: d.z, title: d.title, riseOnHover: true }).on('click', () => pmShow(d.it)).addTo(PM.layer);
+      continue;
+    }
+    const la = g.reduce((a, d) => a + d.it.lat, 0) / g.length, lo = g.reduce((a, d) => a + d.it.lon, 0) / g.length;
+    const hasU = g.some(d => d.it.src === 'usr'), n = g.length;
+    L.marker([la, lo], { keyboard: true, zIndexOffset: 700, title: T("{0} points · zoome pour les voir", [n]),
+      icon: L.divIcon({ className: 'pm-icon', iconSize: [38, 38], iconAnchor: [19, 19], html: `<span class="pm-clu${hasU ? ' usr' : ''}">${n > 99 ? '99+' : n}</span>` }) })
+      .on('click', () => {
+        const bd = L.latLngBounds(g.map(d => [d.it.lat, d.it.lon]));
+        if (bd.getSouthWest().equals(bd.getNorthEast())) map.setView(bd.getCenter(), Math.min(z + 3, 18));
+        else map.fitBounds(bd, { padding: [60, 60], maxZoom: 17 });
+      }).addTo(PM.layer);
+  }
+}
 function pmRender() {
   if (!PM.map || !PM.layer) return;
   PM.layer.clearLayers();
   const b = PM.map.getBounds().pad(0.1), replaced = new Set(), cnt = {};
-  let nO = 0, nU = 0, nV = 0;
+  let nO = 0, nU = 0, nV = 0; const draw = [];
   const verOn = PM.src.usr; // les points OpenStreetMap confirmés « toujours là » par les cyclistes comptent dans « Par les cyclistes » (23/11/2026)
   const usr = [...PM.usr.values()];
   for (const it of usr) if (it.poi.osm_ref && it.poi.status === 'valid') replaced.add(it.poi.osm_ref);
@@ -10322,8 +10351,7 @@ function pmRender() {
       if (!PM.on.has(it.type)) continue;
       if (shown >= PM_MAX_OSM) { PM.cap = true; continue; }
       if (isV) nV++;
-      L.marker([it.lat, it.lon], { icon: pmIcon(it), keyboard: true, zIndexOffset: isV ? 300 : 0, title: (it.name || pmKind(it.tags) || PM_TYPES[it.type].lbl) + ' · OpenStreetMap' + (PM.ver.has(it.ref) ? ' · ' + T("vérifié par les cyclistes") : ''), riseOnHover: true })
-        .on('click', () => pmShow(it)).addTo(PM.layer);
+      draw.push({ it, z: isV ? 300 : 0, title: (it.name || pmKind(it.tags) || PM_TYPES[it.type].lbl) + ' · OpenStreetMap' + (isV ? ' · ' + T("vérifié par les cyclistes") : '') });
       shown++;
     }
     nO = shown - nV;
@@ -10332,10 +10360,10 @@ function pmRender() {
     if (!b.contains([it.lat, it.lon])) continue;
     cnt[it.type] = (cnt[it.type] || 0) + 1;
     if (!PM.on.has(it.type)) continue;
-    L.marker([it.lat, it.lon], { icon: pmIcon(it), keyboard: true, zIndexOffset: 500, title: it.name + ' · ' + T("ajouté par un cycliste"), riseOnHover: true })
-      .on('click', () => pmShow(it)).addTo(PM.layer);
+    draw.push({ it, z: 500, title: it.name + ' · ' + T("ajouté par un cycliste") });
     nU++;
   }
+  pmDraw(draw);
   $('#pmCntOsm').textContent = PM.map.getZoom() < PM_MINZ ? T("zoome pour les voir") : T("{0} points · données libres", [nO]);
   $('#pmCntUsr').textContent = nV ? T("{0} points · dont {1} confirmé(s) ✓", [nU + nV, nV]) : T("{0} points · avis et photos", [nU]);
   const showCnt = PM.map.getZoom() >= PM_MINZ;

@@ -1326,6 +1326,7 @@ window.PMR_I18N = {
     "il y a {0} min": "{0} min ago",
     "un·e cycliste": "a cyclist",
     "zoome pour les voir": "zoom in to see them",
+    "{0} points · zoome pour les voir": "{0} places · zoom in to see them",
     "{0} points · avis et photos": "{0} places · reviews and photos",
     "{0} points · données libres": "{0} places · open data",
     "{0} sur 5": "{0} out of 5",
