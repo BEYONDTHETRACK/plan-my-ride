@@ -1195,6 +1195,9 @@ body.pm-placing .pm-loc{bottom:16px}
 .pm-big img{max-width:100%;max-height:100%;border-radius:8px}
 @media (max-width:420px){.pm-legend{width:170px}.pm-legend b{font-size:13px}}
 /* Carte v2.0 (07/11/2026) : commandes sur le côté, recherche de ville, fiche en deux temps */
+.pm-ctl .pm-zc{position:relative;float:none;margin:0;width:44px;box-sizing:border-box;border:1px solid var(--line)!important;border-radius:999px;background:var(--panel);overflow:hidden;box-shadow:0 1px 2px rgba(20,32,27,.08),0 4px 16px rgba(20,32,27,.06)}
+.pm-ctl .pm-zc a{width:42px;height:42px;line-height:42px;font-size:22px;border:0!important;border-radius:0!important;background:transparent;color:var(--ink);display:block;text-align:center}
+.pm-ctl .pm-zc a+a{border-top:1px solid var(--line)!important}
 .pm-ctl .pm-loc{position:static;width:44px;height:44px;bottom:auto}
 .pm-ctl .leaflet-control-layers{margin:0;float:none;position:relative;width:44px;height:44px;border-radius:999px;border:1px solid var(--line)!important;background:var(--panel);box-shadow:0 1px 2px rgba(20,32,27,.08),0 4px 16px rgba(20,32,27,.1)}
 .pm-ctl .leaflet-control-layers-toggle{width:42px;height:42px;background-size:22px;border-radius:999px}
@@ -9805,6 +9808,7 @@ function pmInitMap(rot) {
   bases[bn].addTo(PM.map);
   const pmLay = L.control.layers(bases, null, { position: 'topright' }).addTo(PM.map);
   const pmCtl = $('#mapPage .pm-ctl'); if (pmCtl) pmCtl.insertBefore(pmLay.getContainer(), $('#pmLocate'));
+  if (pmCtl && PM.map.zoomControl) { const zc = PM.map.zoomControl.getContainer(); zc.classList.add('pm-zc'); pmCtl.appendChild(zc); }
   PM.map.on('baselayerchange', e => { try { localStorage.setItem('pmr-pm-base2', e.name); } catch (er) {} });
   PM.layer = L.layerGroup().addTo(PM.map);
   let v = null; try { v = JSON.parse(localStorage.getItem('pmr-pm-view') || 'null'); } catch (e) {}
