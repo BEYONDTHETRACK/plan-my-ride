@@ -10282,7 +10282,12 @@ async function pmLoadUsr(force) {
   for (const p of data || []) PM.usr.set(p.id, { src: 'usr', key: 'p:' + p.id, type: p.type, name: p.name, lat: p.lat, lon: p.lon, poi: p });
   // points OpenStreetMap vérifiés par les cyclistes (avis validés + « toujours là »), rpc poi_verified
   const vr = await sb.rpc('poi_verified', { s, w, n, e });
-  if (!vr.error) for (const v of vr.data || []) PM.ver.set(v.poi_key, v);
+  if (!vr.error) for (const v of vr.data || []) {
+    PM.ver.set(v.poi_key, v);
+    // le point vient avec sa position : il s'affiche à tous les zooms, comme ceux des cyclistes (23/11/2026)
+    if (v.lat != null && PM_TYPES[v.type] && !PM.osm.has(v.poi_key))
+      PM.osm.set(v.poi_key, { src: 'osm', ref: v.poi_key, type: v.type, name: v.name || '', lat: v.lat, lon: v.lon, tags: { ...(v.t || {}), ...(v.name ? { name: v.name } : {}) } });
+  }
   pmRender();
 }
 
@@ -10300,11 +10305,13 @@ function pmRender() {
   const verOn = PM.src.usr; // les points OpenStreetMap confirmés « toujours là » par les cyclistes comptent dans « Par les cyclistes » (23/11/2026)
   const usr = [...PM.usr.values()];
   for (const it of usr) if (it.poi.osm_ref && it.poi.status === 'valid') replaced.add(it.poi.osm_ref);
-  if ((PM.src.osm || verOn) && PM.map.getZoom() >= PM_MINZ - 1) {
+  if (PM.src.osm || verOn) {
+    const lowZ = PM.map.getZoom() < PM_MINZ - 1;
     let shown = 0; PM.cap = false;
     for (const it of PM.osm.values()) {
       if (replaced.has(it.ref) || !b.contains([it.lat, it.lon])) continue;
       const isV = PM.ver.has(it.ref);
+      if (lowZ && !isV) continue; // les points confirmés se voient à tous les zooms, les autres seulement de près
       if (isV ? !verOn : !PM.src.osm) continue;
       cnt[it.type] = (cnt[it.type] || 0) + 1;
       if (!PM.on.has(it.type)) continue;

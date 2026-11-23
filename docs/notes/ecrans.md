@@ -163,3 +163,4 @@ Notes détaillées de Sillage, sorties de CLAUDE.md le 23/11/2026 (texte d'origi
 
 - Mise en ligne du 21/11/2026 (index.html seulement, web) : types Toilettes, Douche, Défibrillateur de la Carte (type Recharge retiré), rangée de filtres qui défile sur téléphone, lecture des packs sur les carrés couverts par la base (`PM_NEWT`), carrés de frontière (`PK.more`). Distributeur de billets (`atm`) reste en test seulement. L'app (app/) n'a pas été reconstruite.
 
+- Points vérifiés à tous les zooms (23/11/2026, test.html) : `poi_verified` renvoie aussi `type, name, lat, lon, t` (migration `supabase/sql/2026-11-23_poi_verified_pts.sql`, déjà appliquée en base ; additive, index.html l'ignore). `pmLoadUsr` ajoute ces points à `PM.osm` ; `pmRender` ne montre sous le zoom 11 que les points confirmés (`lowZ`).
