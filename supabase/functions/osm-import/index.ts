@@ -49,7 +49,7 @@ async function overpass(q: string): Promise<{ elements?: unknown[]; heavy?: bool
       const host = new URL(url).host;
       try {
         const r = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctls[k].signal,
-          headers: { 'User-Agent': 'Sillage (github.com/antoinechry/plan-my-ride; hello@sillage-ride.eu)' } });
+          headers: { 'User-Agent': 'Sillage/1.0 (https://app.sillage-ride.eu/; hello@sillage-ride.eu)' } });
         if (!r.ok) throw new Error(`${host} ${r.status}`);
         const j = await r.json() as { elements?: unknown[]; remark?: string };
         if (typeof j.remark === 'string' && /runtime error|timed out|out of memory/i.test(j.remark)) return { heavy: true, err: `${host} ${j.remark.slice(0, 80)}` };

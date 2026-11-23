@@ -15,7 +15,7 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
-const UA = 'plan-my-ride/1.0 https://github.com/antoinechry/plan-my-ride';
+const UA = 'Sillage/1.0 (https://app.sillage-ride.eu/; hello@sillage-ride.eu)';
 const MAX_POINTS = 40, PAR = 4, MIN_TTL = 30 * 60e3, KEEP_DAYS = 3;
 
 type Pt = { lat: number; lon: number; asl: number | null; key: string };

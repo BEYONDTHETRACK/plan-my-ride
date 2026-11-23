@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const win = await Promise.any(SERVERS.map(async (url, k) => {
       const host = new URL(url).host;
       try {
-        const r = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctls[k].signal, headers: { 'User-Agent': 'plan-my-ride (github.com/antoinechry/plan-my-ride)' } });
+        const r = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctls[k].signal, headers: { 'User-Agent': 'Sillage/1.0 (https://app.sillage-ride.eu/; hello@sillage-ride.eu)' } });
         if (!r.ok) throw new Error(`${host} ${r.status}`);
         const j = await r.json() as Record<string, unknown>;
         if (typeof j.remark === 'string' && /runtime error|timed out|out of memory/i.test(j.remark)) return { heavy: true, remark: j.remark, host };

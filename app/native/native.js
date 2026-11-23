@@ -10,7 +10,7 @@
 
   // Repères pour la page (CSS : html.native, html.native-ios, html.native-android)
   window.SILLAGE_NATIVE = platform;
-  window.SILLAGE_WEB = 'https://antoinechry.github.io/plan-my-ride/index.html';
+  window.SILLAGE_WEB = 'https://app.sillage-ride.eu/index.html';
   document.documentElement.classList.add('native', 'native-' + platform);
 
   // ---- Encoche / îlot et barre d'état -----------------------------------------

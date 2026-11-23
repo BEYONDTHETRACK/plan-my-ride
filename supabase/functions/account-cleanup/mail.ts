@@ -1,7 +1,7 @@
 // E-mail d'avertissement avant suppression d'un compte inactif (même mise en page que les e-mails de bienvenue).
 const F = 'font-family:Arial,Helvetica,sans-serif;';
 const SITE = 'https://sillage-ride.eu';
-const APP = 'https://antoinechry.github.io/plan-my-ride/';
+const APP = 'https://app.sillage-ride.eu/';
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 function shell(lang: string, pre: string, title: string, inner: string, foot: string) {

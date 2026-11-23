@@ -18,7 +18,7 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
-const SITE = 'https://antoinechry.github.io/plan-my-ride/';
+const SITE = 'https://app.sillage-ride.eu/';
 const SUBJECT = SITE; // contact VAPID (adresse du site plutôt qu'un e-mail)
 const NOTIFY_H: Record<string, number> = { eve: 20, morn: 7 };
 

@@ -13,7 +13,7 @@ const WWW = path.join(APP, 'www');
 const NM = path.join(APP, 'node_modules');
 const TEST = process.argv.includes('--test');
 const SRC = path.join(ROOT, TEST ? 'test.html' : 'index.html');
-const WEB = 'https://antoinechry.github.io/plan-my-ride/';
+const WEB = 'https://app.sillage-ride.eu/';
 
 const die = m => { console.error('✗ ' + m); process.exit(1); };
 const cp = (a, b) => { fs.mkdirSync(path.dirname(b), { recursive: true }); fs.copyFileSync(a, b); };
