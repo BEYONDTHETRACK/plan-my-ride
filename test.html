@@ -8942,11 +8942,13 @@ function pageOpen(pid, tabSel) {
   for (const a of document.querySelectorAll('.tabbar [aria-current]')) a.removeAttribute('aria-current');
   const tb = tabSel && $(tabSel); if (tb) tb.setAttribute('aria-current', 'page');
   if (GUEST && typeof tourView === 'function') tourView(pid);
+  try { if (pid === 'mapPage') sessionStorage.setItem('pmr-open-map', '1'); else sessionStorage.removeItem('pmr-open-map'); } catch (e) {} // un rafraîchissement garde la Carte ouverte
 }
 function pageClose() {
   if (!PAGES.some(q => { const el = document.getElementById(q); return el && !el.hidden; })) return;
   for (const q of PAGES) { const el = document.getElementById(q); if (el) el.hidden = true; }
   document.body.classList.remove('lib-open');
+  try { sessionStorage.removeItem('pmr-open-map'); } catch (e) {}
   for (const a of document.querySelectorAll('.tabbar [aria-current]')) a.removeAttribute('aria-current');
   const mt = $('#tabMode'); if (mt) mt.setAttribute('aria-current', 'page');
   for (const a of document.querySelectorAll('.tabbar a[data-mode]')) { if (a.dataset.mode === S.mode) a.setAttribute('aria-current', 'page'); }
@@ -9409,6 +9411,7 @@ function a11ySet(ch) {
 $('#meCvd').addEventListener('change', () => a11ySet({ cvd: $('#meCvd').value }));
 $('#meMotion').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (b && b.getAttribute('aria-pressed') !== 'true') a11ySet({ motion: b.dataset.v }); });
 $('#meFont').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (b && b.getAttribute('aria-pressed') !== 'true') a11ySet({ font: b.dataset.v }); });
+try { if (sessionStorage.getItem('pmr-open-map')) { if (!document.body.classList.contains('gated')) setTimeout(pmOpen, 0); } } catch (e) {}
 try { if (sessionStorage.getItem('pmr-open-me')) { sessionStorage.removeItem('pmr-open-me'); if (!document.body.classList.contains('gated')) setTimeout(meOpen, 0); } } catch (e) {}
 // lien direct vers la Carte (#carte, depuis le rail de la supervision, 03/11/2026)
 // #carte=lat,lon[,p:<id>] : la Carte ouverte sur un point (lien « Voir sur la carte » de la supervision, 20/11/2026)
