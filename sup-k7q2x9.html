@@ -1189,31 +1189,38 @@ function pBadge() {
   $('poiCnt').textContent = n || ''; $('poiCnt').hidden = !n;
   if (typeof renderTodo === 'function' && S.users) renderTodo();
 }
-async function pDupPump() {
-  if (P.busy) return; P.busy = true;
-  while (P.q.length) {
-    const p = P.q.shift(), d = P.dup[p.id]; d.state = 'load'; if (S.tab === 'poi') pRender();
-    const q = `[out:json][timeout:25];
-(
-nwr(around:200,${p.lat},${p.lon})["amenity"~"^(drinking_water|water_point|cafe|restaurant|fast_food|pub|bar|shelter|bicycle_repair_station|device_charging_station|fountain|charging_station)$"];
-nwr(around:200,${p.lat},${p.lon})["man_made"="water_tap"];
-nwr(around:200,${p.lat},${p.lon})["shop"~"^(bakery|pastry|convenience|supermarket|general|greengrocer|farm|bicycle)$"];
-nwr(around:200,${p.lat},${p.lon})["tourism"~"^(camp_site|camp_pitch|wilderness_hut|alpine_hut)$"];
-);
-out center tags;`;
-    try {
-      const r = await fetch(SUPABASE_URL + '/functions/v1/osm-overpass', { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ q }) });
-      const j = await r.json();
-      if (!r.ok || !Array.isArray(j.elements)) throw new Error('osm');
-      const taken = new Set(P.pois.filter(x => x.osm_ref && x.id !== p.id).map(x => x.osm_ref));
-      d.list = j.elements.map(e => ({ ref: e.type + '/' + e.id, tags: e.tags || {}, lat: e.lat ?? e.center?.lat, lon: e.lon ?? e.center?.lon }))
-        .filter(e => isFinite(e.lat) && pClassify(e.tags) === p.type && !taken.has(e.ref))
-        .map(e => ({ ...e, m: pDist(p.lat, p.lon, e.lat, e.lon) })).sort((x, y) => x.m - y.m).slice(0, 4);
-      d.state = 'done';
-    } catch (e) { d.state = 'err'; }
-    if (S.tab === 'poi') pRender();
+const P_DB_TYPES = new Set(['cafe', 'epicerie', 'fontaine', 'hebergement', 'boulangerie', 'abri', 'pharmacie', 'commerce', 'carburant', 'bivouac', 'atelier']); // types présents dans la table osm_poi
+const P_OVP = { // types absents de osm_poi : requête Overpass ciblée (plus courte, donc plus rapide)
+  wc: '["amenity"="toilets"]', douche: '["amenity"="shower"]', defibrillateur: '["emergency"="defibrillator"]', atm: '["amenity"="atm"]',
+  recharge: '["amenity"~"^(device_charging_station|charging_station)$"]' };
+// Doublons possibles d'un point (23/11/2026) : on lit d'abord la base osm_poi (instantané, index lat/lon) ; Overpass seulement pour les types qu'elle n'a pas ; 3 recherches à la fois
+async function pDupFind(p) {
+  const dl = 200 / 111320, dn = dl / Math.max(.2, Math.cos(p.lat * Math.PI / 180));
+  let els;
+  if (P_DB_TYPES.has(p.type)) {
+    const { data, error } = await sb.from('osm_poi').select('id,type,name,lat,lon,t').eq('type', p.type)
+      .gte('lat', p.lat - dl).lte('lat', p.lat + dl).gte('lon', p.lon - dn).lte('lon', p.lon + dn).limit(60);
+    if (error) throw new Error('db');
+    els = (data || []).map(e => ({ ref: e.id, tags: { ...(e.t || {}), ...(e.name ? { name: e.name } : {}) }, lat: e.lat, lon: e.lon }));
+  } else {
+    const sel = P_OVP[p.type]; if (!sel) return [];
+    const q = `[out:json][timeout:20];\nnwr(around:200,${p.lat},${p.lon})${sel};\nout center tags;`;
+    const r = await fetch(SUPABASE_URL + '/functions/v1/osm-overpass', { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ q }) });
+    const j = await r.json();
+    if (!r.ok || !Array.isArray(j.elements)) throw new Error('osm');
+    els = j.elements.map(e => ({ ref: e.type + '/' + e.id, tags: e.tags || {}, lat: e.lat ?? e.center?.lat, lon: e.lon ?? e.center?.lon }));
   }
-  P.busy = false;
+  const taken = new Set(P.pois.filter(x => x.osm_ref && x.id !== p.id).map(x => x.osm_ref));
+  return els.filter(e => isFinite(e.lat) && !taken.has(e.ref)).map(e => ({ ...e, m: pDist(p.lat, p.lon, e.lat, e.lon) })).filter(e => e.m <= 200).sort((x, y) => x.m - y.m).slice(0, 4);
+}
+async function pDupPump() {
+  P.busy = (P.busy || 0);
+  while (P.busy < 3 && P.q.length) {
+    const p = P.q.shift(), d = P.dup[p.id]; d.state = 'load'; P.busy++;
+    pDupFind(p).then(l => { d.list = l; d.state = 'done'; }).catch(() => { d.state = 'err'; })
+      .finally(() => { P.busy--; if (S.tab === 'poi') pRender(); pDupPump(); });
+  }
+  if (S.tab === 'poi') pRender();
 }
 function pStatus(st, merged) {
   return '<span class="pst ' + st + '">' + (st === 'valid' ? (merged ? '✓ Fusionné · remplace le point OSM' : '✓ Validé') : st === 'removed' ? '✕ Retiré' : '◷ En validation · visible') + '</span>';
