@@ -1,5 +1,5 @@
 // Sillage : relais en lecture vers les packs de points OSM publiés dans la release « poi-packs » du dépôt
-// antoinechry/plan-my-ride (12/11/2026). Les téléchargements de releases GitHub ne sont pas lisibles par une page web
+// BEYONDTHETRACK/plan-my-ride (12/11/2026). Les téléchargements de releases GitHub ne sont pas lisibles par une page web
 // (pas d'en-tête CORS) : la page passe par ici. L'app iPhone / Android pourra lire GitHub directement plus tard.
 // GET ?f=index.json | ?f=<pack>.ndjson.gz → le fichier tel quel. Déployée sans vérification JWT (requête simple, sans
 // en-tête, pour éviter le pré-vol CORS) : elle ne lit que ces fichiers publics.
@@ -9,7 +9,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 };
-const REL = 'https://github.com/antoinechry/plan-my-ride/releases/download/poi-packs/';
+const REL = 'https://github.com/BEYONDTHETRACK/plan-my-ride/releases/download/poi-packs/';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
