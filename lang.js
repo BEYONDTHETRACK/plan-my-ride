@@ -1089,6 +1089,7 @@ window.PMR_I18N = {
     "Sillage (Archivo)": "Sillage (Archivo)",
     "Très lisible": "Extra legible",
     "Supprimer mon compte": "Delete my account",
+    "Version {0}": "Version {0}",
     "Ton compte, tes parcours, tes alertes météo et ton inscription à la lettre d'info seront effacés définitivement. Ce n'est pas réversible.": "Your account, routes, weather alerts and newsletter subscription will be erased for good. This cannot be undone.",
     "Ton mot de passe, pour confirmer": "Your password, to confirm",
     "Supprimer définitivement": "Delete permanently",
