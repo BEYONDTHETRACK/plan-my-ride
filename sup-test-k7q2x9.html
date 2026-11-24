@@ -394,8 +394,8 @@ dialog h2{margin-bottom:6px}
 
         <div class="side">
           <section class="card pad" aria-labelledby="h-pend" id="pendSec">
-            <h2 id="h-pend">À valider<span class="n" id="pendN">0</span></h2>
-            <p class="empty" id="pendEmpty">Aucune demande en attente. Les inscriptions sans lien testeur arrivent ici.</p>
+            <h2 id="h-pend">E-mails non confirmés<span class="n" id="pendN">0</span></h2>
+            <p class="empty" id="pendEmpty">Aucune inscription en attente. Un compte arrive ici tant que la personne n'a pas cliqué dans l'e-mail de confirmation.</p>
             <div class="pend" id="pend"></div>
           </section>
           <section class="card pad" aria-labelledby="h-links">
@@ -600,14 +600,15 @@ function renderKpis(){
   const act = S.users.filter(u => u.status === 'active');
   const who7 = new Set(S.ev.filter(recent).map(e => e.user_id));
   for (const [id, a] of Object.entries(S.auth)) if (a.last_sign_in_at && new Date(a.last_sign_in_at) > d7) who7.add(id);
-  const pend = S.users.filter(u => u.status === 'pending').length;
+  const isNew = n => u => u.status !== 'pending' && u.created_at && new Date(u.created_at) > Date.now() - n * DAY;
+  const n7 = S.users.filter(isNew(7)).length, n30 = S.users.filter(isNew(30)).length;
   const opens = S.ev.filter(e => e.event === 'open'), gpx = S.ev.filter(e => e.event === 'gpx');
   const routes = Object.values(S.auth).reduce((t, a) => t + (a.routes || 0), 0);
   const k = (l, v, s, cls) => '<div class="kpi"><div class="l">' + l + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s ' + (cls || '') + '">' + s + '</div>' : '') + '</div>';
   const mb = S.mb;
   const g7 = new Set((S.guestEv || []).filter(e => new Date(e.at) > Date.now() - 7 * DAY).map(e => e.user_id)).size;
   $('kpis').innerHTML = k('Comptes actifs', act.length, 'dont ' + act.filter(u => who7.has(u.user_id)).length + ' venus cette semaine · ' + g7 + ' visite' + (g7 > 1 ? 's' : '') + ' sans compte en 7 j')
-    + k('À valider', pend, pend ? 'demande à traiter' : 'rien en attente', pend ? 'warn' : 'good')
+    + k('Nouveaux comptes', n7 + ' <small>/ 7 j</small>', n30 + ' sur 30 jours')
     + k('Ouvertures', opens.filter(recent).length + ' <small>/ 7 j</small>', opens.length + ' sur 30 jours')
     + k('GPX chargés', gpx.filter(recent).length + ' <small>/ 7 j</small>', routes + ' parcours en tout')
     + (mb ? '<div class="kpi"><div class="l">Crédits meteoblue</div><div class="v">' + nf1.format(mb.remaining / 1e6) + ' <small>M restants</small></div>'
@@ -628,9 +629,9 @@ function renderTodo(){
     + (nP == null ? card('Points et avis', 'lecture en cours…', '')
       : nP ? card(nPoi + ' point' + (nPoi > 1 ? 's' : '') + (nRev ? ' · ' + nRev + ' avis' : '') + ' à valider', 'Ajoutés par les cyclistes, en attente de ta décision', '<button type="button" class="go" data-todo="poi">Voir les points</button>', true)
       : card('Aucun point à valider', 'Rien en attente côté cartes et avis', '<span class="ok">✓ Rien à faire</span>'))
-    + (pendU ? card(pendU + ' compte' + (pendU > 1 ? 's' : '') + ' en attente', 'Demandes d\'accès à valider', '<button type="button" class="go" data-todo="pend">Voir les demandes</button>', true)
-      : card('Aucun compte en attente', 'Les inscriptions sont ouvertes : la confirmation par e-mail suffit', '<span class="ok">✓ Rien à faire</span>'))
-    + card('Open-Meteo : ' + pct + ' % du mois', nf.format(calls) + ' appels sur 1 million' + (req ? ' · ' + Math.round(hits / req * 100) + ' % servis par le cache' : ''), meter(Math.min(1, calls / 1e6), 'Open-Meteo : ' + pct + ' % du forfait utilisé'), pct >= 80);
+    + (pendU ? card(pendU + ' e-mail' + (pendU > 1 ? 's' : '') + ' non confirmé' + (pendU > 1 ? 's' : ''), 'Inscription en attente du clic dans l\'e-mail : rien à faire de ton côté', '<button type="button" class="link" data-todo="pend">Voir</button>')
+      : card('Aucune inscription en attente', 'La confirmation par e-mail suffit, pas de validation à faire', '<span class="ok">✓ Rien à faire</span>'))
+    + card('Open-Meteo : ' + pct + ' % du mois', nf.format(Math.round(calls)) + ' appels sur 1 million' + (req ? ' · ' + Math.round(hits / req * 100) + ' % servis par le cache' : ''), meter(Math.min(1, calls / 1e6), 'Open-Meteo : ' + pct + ' % du forfait utilisé'), pct >= 80);
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-todo]'); if (!b) return; if (b.dataset.todo === 'poi') setTab('poi'); else { const p = $('pendSec'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
 
@@ -712,7 +713,7 @@ function renderPend(){
   const pend = S.users.filter(u => u.status === 'pending');
   $('pendN').textContent = pend.length; $('pendEmpty').hidden = !!pend.length;
   $('pend').innerHTML = pend.map(u => '<div class="pc" data-id="' + u.user_id + '"><b>' + esc(u.prenom || u.email) + '</b><span class="m">' + esc(u.email || '') + ' · inscrit ' + ago(u.created_at) + '</span>'
-    + '<div class="uxbtns"><button type="button" class="b sm pri" data-a="ok">Valider</button><button type="button" class="b sm bad" data-a="block">Refuser</button><span class="saved" data-s></span></div></div>').join('');
+    + '<div class="uxbtns"><button type="button" class="b sm pri" data-a="ok">Activer sans confirmation</button><button type="button" class="b sm bad" data-a="block">Refuser</button><span class="saved" data-s></span></div></div>').join('');
 }
 function renderLinks(){
   $('links').innerHTML = S.links.map(l => '<div class="lk' + (l.active ? '' : ' off') + '" data-code="' + esc(l.code) + '"><span class="t"><b>' + esc(l.label || 'Lien testeur') + '</b>'
