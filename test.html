@@ -6108,9 +6108,9 @@ async function kindSet(id, kind) { // changer le dossier d'un parcours : liste, 
 // Chaque page (Sortie / Ultra) garde ses propres réglages. La page Ultra garde aussi la date de départ (date de la course).
 const optKey = () => (S.mode === 'ultra' ? 'pmr-opt-ultra' : S.mode === 'taf' ? 'pmr-opt-taf' : 'pmr-opt');
 const MODE_DEF = {
-  ride: { time: '08:00', speed: 25, vam: 0, pause: 0, pauseMode: 'pct', pauseMin: 0, pauseEvery: 1, windOn: true, poiRadius: 500, laps: 1, lapPause: 10 },
-  taf: { time: '07:45', speed: 20, vam: 0, pause: 0, pauseMode: 'pct', pauseMin: 0, pauseEvery: 1, windOn: true, poiRadius: 500, tafBack: '17:30', tafRet: '' },
-  ultra: { time: '07:00', speed: 22, vam: 0, pause: 0, pauseMode: 'min', pauseMin: 0, pauseEvery: 1, windOn: true, poiRadius: 500, planDays: 3, planSplit: 'km', planCustom: false, planTimes: [], planEnds: [] }
+  ride: { time: '08:00', speed: 25, vam: 0, pause: 0, pauseMode: 'pct', pauseMin: 0, pauseEvery: 1, windOn: false, poiRadius: 500, laps: 1, lapPause: 10 },
+  taf: { time: '07:45', speed: 20, vam: 0, pause: 0, pauseMode: 'pct', pauseMin: 0, pauseEvery: 1, windOn: false, poiRadius: 500, tafBack: '17:30', tafRet: '' },
+  ultra: { time: '07:00', speed: 22, vam: 0, pause: 0, pauseMode: 'min', pauseMin: 0, pauseEvery: 1, windOn: false, poiRadius: 500, planDays: 3, planSplit: 'km', planCustom: false, planTimes: [], planEnds: [] }
 };
 function saveOpt(o) { try { localStorage.setItem(optKey(), JSON.stringify({ ...o, date: S.mode === 'ultra' ? o.date : undefined })); } catch (e) {} }
 function initInputs() {
