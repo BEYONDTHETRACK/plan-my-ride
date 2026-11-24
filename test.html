@@ -1083,6 +1083,10 @@ body.guest .lp-more,body.guest #libPage .lp-tools,body.lim #outPage .lp-tools,bo
 .pm-round.busy{opacity:.5}
 .pm-round.busy svg{animation:pmSpin 1.2s linear infinite}
 @keyframes pmSpin{to{transform:rotate(360deg)}}
+.pm-note.busy:not([hidden]){display:flex;align-items:center;gap:8px;padding:5px 14px 5px 8px}
+.pm-note .pm-mark{flex:none;display:block}
+.pm-note .pm-turn{transform-box:view-box;transform-origin:70px 48px;animation:pmSpin 2.4s linear infinite}
+html[data-motion="reduce"] .pm-note .pm-turn{animation:none}
 .pm-round.on{color:var(--accent)}
 .pm-round.on .pm-dot{fill:currentColor}
 .pm-round.head{background:var(--accent);border-color:var(--accent);color:var(--panel)}
@@ -9752,8 +9756,14 @@ nwr["tourism"~"^(camp_site|camp_pitch|wilderness_hut|alpine_hut)$"];
 );
 out center tags;`;
 }
-function pmNote(txt, btn) {
-  const n = $('#pmNote'); if (!n) return; n.textContent = txt || ''; n.hidden = !txt;
+/* Logo Sillage dont les rayons du soleil tournent, devant « Chargement des points… » */
+const PM_MARK = '<svg class="mark pm-mark" width="28" height="25" viewBox="0 0 110 100" aria-hidden="true"><defs><mask id="mkPm"><rect width="110" height="100" fill="#fff"/><circle cx="70" cy="48" r="31" fill="#000"/></mask></defs><g class="mk-ink" mask="url(#mkPm)"><circle cx="44" cy="56" r="15"/><rect x="18" y="58" width="56" height="16" rx="8"/></g><circle class="mk-ring" cx="70" cy="48" r="26"/><path class="mk-ray pm-turn" d="M82 48h5M78.5 56.5l3.5 3.5M70 60v5M61.5 56.5L58 60M58 48h-5M61.5 39.5L58 36M70 36v-5M78.5 39.5L82 36"/><circle class="mk-sun" cx="70" cy="48" r="8"/><path class="mk-rain" d="M28 82l-3 9M41 82l-3 9M54 82l-3 9"/></svg>';
+function pmNote(txt, btn, busy) {
+  const n = $('#pmNote'); if (!n) return;
+  const k = (busy ? '1' : '0') + (txt || '');
+  if (busy && !n.hidden && n.dataset.k === k) return; // déjà affiché : on ne relance pas l'animation
+  n.dataset.k = k; n.textContent = txt || ''; n.hidden = !txt; n.classList.toggle('busy', !!(txt && busy));
+  if (txt && busy) n.insertAdjacentHTML('afterbegin', PM_MARK);
   if (txt && btn) { const b = document.createElement('button'); b.type = 'button'; b.textContent = btn[0]; b.addEventListener('click', btn[1]); n.appendChild(b); }
 }
 function pmStatus() {
@@ -9762,7 +9772,7 @@ function pmStatus() {
   if (PM.map.getZoom() < PM_MINZ) return PM.loc.watch == null && navigator.geolocation
     ? pmNote(T("Zoome pour voir les points OpenStreetMap"), [T("Me localiser"), () => pmLocStart()])
     : pmNote(T("Zoome pour voir les points OpenStreetMap"));
-  if (PM.running || PM.queue.length) return pmNote(T("Chargement des points OpenStreetMap…"));
+  if (PM.running || PM.queue.length) return pmNote(T("Chargement des points OpenStreetMap…"), null, true);
   if (PM.failed) return pmNote(T("OpenStreetMap ne répond pas : réessaie dans un moment"));
   if (PM.cap) return pmNote(T("Beaucoup de points ici : zoome pour tous les voir"));
   pmNote('');
