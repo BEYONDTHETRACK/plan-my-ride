@@ -815,6 +815,7 @@ window.PMR_I18N = {
     "Vente à la ferme": "Farm shop",
     "Version test": "Test version",
     "Vitesse de montée (VAM)": "Climbing speed (VAM)",
+    "désactivée": "off",
     "Vitesse moyenne": "Average speed",
     "Vitesse sur le plat": "Speed on the flat",
     "Voir tous mes parcours": "See all my routes",

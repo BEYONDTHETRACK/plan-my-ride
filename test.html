@@ -2153,7 +2153,7 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     </div>
     <div class="field">
       <label class="label" for="vam">Vitesse de montée (VAM)</label>
-      <div class="range"><input type="range" id="vam" min="300" max="1400" step="50"><output id="vamOut" class="mono"></output></div>
+      <div class="range"><input type="range" id="vam" min="0" max="1400" step="50"><output id="vamOut" class="mono"></output></div>
       <p class="hint">Mètres de dénivelé positif gravis par heure, en plus du temps de plat.</p>
     </div>
     <div class="field">
@@ -3506,7 +3506,7 @@ function planCost(P, opt) { // coût cumulé « terrain » (heures de pédalage 
     const dk = P.d[i] - P.d[i - 1]; if (dk <= 0) { cum[i] = cum[i - 1]; continue; }
     const dh = P.es[i] - P.es[i - 1], grade = dh / (dk * 1000);
     const v = grade < -0.01 ? opt.speed * Math.min(1.35, 1 + (-grade - 0.01) * 6) : opt.speed;
-    cum[i] = cum[i - 1] + dk / v + (grade > 0.005 ? dh / opt.vam : 0);
+    cum[i] = cum[i - 1] + dk / v + (grade > 0.005 && opt.vam > 0 ? dh / opt.vam : 0);
   }
   P._planCum = { key, cum };
   return cum;
@@ -3553,7 +3553,7 @@ function simulate(t0, opt, useWx) {
     let head = 0;
     if (w) head = w.ws * Math.cos((w.wd - P.b[i]) * RAD);
     const f = (w && opt.windOn) ? clamp(1 - 0.012 * head, 0.55, 1.35) : 1;
-    let dtH = dk / (v * f) + (grade > 0.005 && !avg ? dh / opt.vam : 0); if (!avg) dtH *= 1 + opt.pause / 100;
+    let dtH = dk / (v * f) + (grade > 0.005 && !avg && opt.vam > 0 ? dh / opt.vam : 0); if (!avg) dtH *= 1 + opt.pause / 100;
     if (w) {
       st.rain += w.pr * dtH; if (w.pr >= 0.2) st.wetH += dtH;
       if (head > 5) st.headKm += dk; else if (head < -5) st.tailKm += dk; else st.crossKm += dk;
@@ -6108,9 +6108,9 @@ async function kindSet(id, kind) { // changer le dossier d'un parcours : liste, 
 // Chaque page (Sortie / Ultra) garde ses propres réglages. La page Ultra garde aussi la date de départ (date de la course).
 const optKey = () => (S.mode === 'ultra' ? 'pmr-opt-ultra' : S.mode === 'taf' ? 'pmr-opt-taf' : 'pmr-opt');
 const MODE_DEF = {
-  ride: { time: '08:00', speed: 25, vam: 700, pause: 10, pauseMode: 'pct', pauseMin: 6, pauseEvery: 1, windOn: true, poiRadius: 500, laps: 1, lapPause: 10 },
-  taf: { time: '07:45', speed: 20, vam: 600, pause: 5, pauseMode: 'pct', pauseMin: 3, pauseEvery: 1, windOn: true, poiRadius: 500, tafBack: '17:30', tafRet: '' },
-  ultra: { time: '07:00', speed: 22, vam: 600, pause: 20, pauseMode: 'min', pauseMin: 12, pauseEvery: 1, windOn: true, poiRadius: 500, planDays: 3, planSplit: 'km', planCustom: false, planTimes: [], planEnds: [] }
+  ride: { time: '08:00', speed: 25, vam: 0, pause: 0, pauseMode: 'pct', pauseMin: 0, pauseEvery: 1, windOn: true, poiRadius: 500, laps: 1, lapPause: 10 },
+  taf: { time: '07:45', speed: 20, vam: 0, pause: 0, pauseMode: 'pct', pauseMin: 0, pauseEvery: 1, windOn: true, poiRadius: 500, tafBack: '17:30', tafRet: '' },
+  ultra: { time: '07:00', speed: 22, vam: 0, pause: 0, pauseMode: 'min', pauseMin: 0, pauseEvery: 1, windOn: true, poiRadius: 500, planDays: 3, planSplit: 'km', planCustom: false, planTimes: [], planEnds: [] }
 };
 function saveOpt(o) { try { localStorage.setItem(optKey(), JSON.stringify({ ...o, date: S.mode === 'ultra' ? o.date : undefined })); } catch (e) {} }
 function initInputs() {
@@ -6232,7 +6232,7 @@ function tafRouteSwitch(from, to) { modeRoute(from, to); }
 window.addEventListener('hashchange', () => switchMode(hashMode(location.hash)));
 function syncOutputs() {
   $('#speedOut').textContent = fV(+$('#speed').value, 1) + ' ' + UL.kmh;
-  $('#vamOut').textContent = fE(+$('#vam').value) + ' ' + UL.mh;
+  $('#vamOut').textContent = +$('#vam').value > 0 ? fE(+$('#vam').value) + ' ' + UL.mh : T("désactivée");
   $('#pauseOut').textContent = '+' + $('#pause').value + ' %';
   const pm = segVal('#pauseSeg') === 'min';
   $('#pausePctRow').hidden = pm; $('#pauseMinRow').hidden = !pm;
@@ -7270,7 +7270,7 @@ function renderPlan() {
   const sum = f => days.reduce((s, d) => s + f(d), 0), nights = days.filter(d => d.night).length;
   $('#planFoot').innerHTML = days.length > 1 ? T("Total : {0} km · D+ {1} m · {2} de pédalage · {3} de pauses · {4} · arrivée {5}", [fD(sum(d => d.dist), 0), fE(sum(d => d.dplus)), durShort(sum(d => d.rideH)), durShort(sum(d => d.pauseH)), nights === 1 ? T("1 nuit") : T("{0} nuits", [nights]), whenTxt(S.tl.end, t0)]) : '';
   $('#planTitle').textContent = days.length > 1 ? T("Ton ultra en {0} jours", [days.length]) : T("Ton ultra d'une traite");
-  $('#planSpeedSum').textContent = `${fV(opt.speed, 1)} ${UL.kmh} · VAM ${fE(opt.vam)} ${UL.mh} · ${pauseTxt(opt)}${opt.windOn ? ' · ' + T("vent compris") : ''}`;
+  $('#planSpeedSum').textContent = [`${fV(opt.speed, 1)} ${UL.kmh}`, opt.vam > 0 ? `VAM ${fE(opt.vam)} ${UL.mh}` : '', opt.pause > 0 ? pauseTxt(opt) : '', opt.windOn ? T("vent compris") : ''].filter(Boolean).join(' · ');
   $('#planNote').innerHTML = (opt.planDays > 1 ? (opt.planSplit === 'terrain' ? T("Étapes de même temps de pédalage.") : T("Étapes de même distance.")) + ' ' : '') + T("Fin de journée estimée avec ta vitesse sur le plat ({0} km/h), ta VAM ({1} m/h) et tes arrêts courts ({2}){3} : réglages ci-dessus.{4}", [fV(opt.speed, 1), fE(opt.vam), pauseTxt(opt), opt.windOn ? T(", vent compris") : '', late ? T(" <span class=\"late\">⚠ {0} après l'heure de départ du lendemain : allonge le découpage, avance une heure de fin ou retarde un départ.</span>", [late > 1 ? T("{0} étapes finissent", [late]) : T("Une étape finit")]) : '']);
   $('#planCustomOn').closest('label').hidden = opt.planDays < 2;
   $('#planReset').hidden = !(custom && opt.planDays > 1 && (PLAN.times.some(Boolean) || PLAN.ends.some(Boolean)));
@@ -9378,9 +9378,9 @@ function meRender() {
   meTafSel();
 }
 function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); }
-const ME_STEP = { speed: [12, 40, 0.5], vam: [300, 1400, 50], pmin: [0, 30, 1] };
+const ME_STEP = { speed: [12, 40, 0.5], vam: [0, 1400, 50], pmin: [0, 30, 1] };
 function meModesRender() {
-  const m = ME.mode, g = meGet(m), fmt = { speed: v => fV(+v, 1) + ' ' + UL.kmh, vam: v => fE(+v) + ' ' + UL.mh, pmin: v => v + ' min' };
+  const m = ME.mode, g = meGet(m), fmt = { speed: v => fV(+v, 1) + ' ' + UL.kmh, vam: v => +v > 0 ? fE(+v) + ' ' + UL.mh : T("désactivée"), pmin: v => v + ' min' };
   const rows = m === 'taf' ? [['speed', T("Vitesse moyenne"), T("trajet complet, sans arrêts")]]
     : [['speed', T("Vitesse sur le plat"), T("sans vent")], ['vam', T("VAM"), T("mètres grimpés par heure")], ['pmin', T("Arrêts courts"), T("par heure de pédalage")]];
   $('#meModes').innerHTML = rows.map(([k, lb, sub]) => { const [lo, hi] = ME_STEP[k], v = +g[k];
