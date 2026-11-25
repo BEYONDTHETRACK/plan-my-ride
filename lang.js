@@ -1009,6 +1009,9 @@ window.PMR_I18N = {
     "⇄ Inverser le sens": "⇄ Reverse direction",
     "✓ Alertes actives sur cet appareil": "✓ Alerts active on this device",
     "✓ Cet appareil peut recevoir les alertes": "✓ This device can receive alerts",
+    "✓ Notifications actives sur cet appareil": "✓ Notifications on for this device",
+    "Notifications activées : tu recevras les nouvelles de Sillage sur cet appareil.": "Notifications on: you will get Sillage news on this device.",
+    "Choisis un parcours enregistré et reçois sa météo la veille au soir ou le matin même. En attendant, active les notifications pour recevoir les nouvelles de Sillage.": "Pick a saved route and get its weather the evening before or that morning. Meanwhile, turn on notifications to get Sillage news.",
     "🎟️ Invitation testeur : ton accès sera ouvert tout de suite.": "🎟️ Tester invitation: your access will open straight away.",
     "🔒 meteoblue verrouillé": "🔒 meteoblue locked",
     // export image, charte Sillage (26/10/2026)

@@ -2010,11 +2010,11 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
   <div class="me-card" id="alCard"><h3>Alertes météo</h3>
     <p class="hint">La météo de ton parcours à ton heure de départ, la veille au soir ou le matin même.</p><div class="me-next" id="alNext" hidden><span>Prochaine alerte</span><b id="alNextTxt"></b></div>
     <div class="guest-lock guest-only"><b>Avec un compte gratuit</b><p>Choisis un parcours enregistré et reçois sa météo la veille au soir ou le matin même.</p><button type="button" class="btn small primary" data-guest-up>Créer mon compte gratuit</button></div>
-    <div class="guest-lock free-only"><b>Avec Sillage.cc +</b><p>Choisis un parcours enregistré et reçois sa météo la veille au soir ou le matin même.</p><button type="button" class="btn small primary" data-plus>Découvrir Sillage.cc +</button></div>
-    <p class="al-why no-lim" id="alWhy" hidden></p>
-    <div id="alBox" class="no-lim">
+    <div class="guest-lock free-only"><b>Avec Sillage.cc +</b><p>Choisis un parcours enregistré et reçois sa météo la veille au soir ou le matin même. En attendant, active les notifications pour recevoir les nouvelles de Sillage.</p><button type="button" class="btn small primary" data-plus>Découvrir Sillage.cc +</button></div>
+    <p class="al-why no-guest" id="alWhy" hidden></p>
+    <div id="alBox" class="no-guest">
       <div class="me-btns al-dev"><button type="button" class="btn small primary" id="alOn">Activer sur cet appareil</button><span class="al-state" id="alState"></span></div>
-      <details class="me-more" id="alMore"><summary><span class="me-lt"><b>Régler les alertes</b><span>Parcours, heure, la veille ou le matin, jours</span></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <details class="me-more no-lim" id="alMore"><summary><span class="me-lt"><b>Régler les alertes</b><span>Parcours, heure, la veille ou le matin, jours</span></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
       <span class="al-l">Dossier</span>
       <div class="me-mseg al-kind" id="alKind" role="group" aria-label="Dossier des parcours"></div>
       <label class="al-l" for="alRoute">Parcours</label>
@@ -9576,13 +9576,15 @@ async function alFn(action, extra) {
   return data;
 }
 function alMsg(t) { $('#alMsg').textContent = t || ''; }
+// Compte gratuit (25/11/2026) : pas d'alertes météo, mais l'appareil peut recevoir les messages de Sillage (supervision).
+const alNtf = (v) => { try { if (v === undefined) return localStorage.getItem('pmr-ntf') === '1'; if (v) localStorage.setItem('pmr-ntf', '1'); else localStorage.removeItem('pmr-ntf'); } catch (e) { return false; } };
 async function alLoad() {
   if (AL.loaded) return; AL.loaded = true;
   try { const sb = await sbIfLogged(); if (sb) { const { data } = await sb.from('push_alerts').select('*').maybeSingle(); AL.row = data || null; } } catch (e) {}
   if (alNat()) {
     try {
       AL.perm = (await alFM().checkPermissions()).receive;
-      if (AL.perm === 'granted' && AL.row && AL.row.enabled) { // jeton rafraîchi à chaque ouverture (il peut changer)
+      if (AL.perm === 'granted' && ((AL.row && AL.row.enabled) || (FREE && alNtf()))) { // jeton rafraîchi à chaque ouverture (il peut changer)
         const { token } = await alFM().getToken(); await alFn('device_register', { token, platform: window.SILLAGE_NATIVE }); AL.tok = token;
       }
     } catch (e) {}
@@ -9606,7 +9608,7 @@ function alRender() {
     why.hidden = false; why.textContent = T("Les notifications sont bloquées pour Sillage : autorise-les dans les réglages du navigateur (ou de l'app), puis reviens ici.");
   } else why.hidden = true;
   $('#alOn').hidden = !alCan() || dev;
-  $('#alState').textContent = dev ? (on ? T("✓ Alertes actives sur cet appareil") : T("✓ Cet appareil peut recevoir les alertes")) : '';
+  $('#alState').textContent = dev ? (FREE ? T("✓ Notifications actives sur cet appareil") : on ? T("✓ Alertes actives sur cet appareil") : T("✓ Cet appareil peut recevoir les alertes")) : '';
   $('#alState').classList.toggle('on', dev && on);
   // Dossier choisi d'abord (12/11/2026, demande d'Antoine) : Sortie / Commute / Ultra, puis seulement ses parcours.
   const all = LIB.list.filter(x => x.remote).sort((a, b) => a.name.localeCompare(b.name, LANG));
@@ -9656,6 +9658,7 @@ $('#alOn').addEventListener('click', async () => {
       const { token } = await alFM().getToken();
       await alFn('device_register', { token, platform: window.SILLAGE_NATIVE });
       AL.tok = token;
+      if (FREE) { alNtf(true); alMsg(T("Notifications activées : tu recevras les nouvelles de Sillage sur cet appareil.")); return; }
       if (await alSave({ enabled: true })) alMsg(T("C'est prêt : tu recevras la météo de « {0} » {1}. « Envoyer l'alerte maintenant » pour voir à quoi elle ressemble.", [AL.row.route_name || T("ton parcours"), AL.row.notify === 'morn' ? T("le matin à 7 h") : T("la veille à 20 h")]));
       return;
     }
