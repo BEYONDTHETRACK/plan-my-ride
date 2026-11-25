@@ -984,7 +984,6 @@ details[open]>summary .me-chev{transform:rotate(90deg)}
 .me-out{color:var(--accent)}
 .me-del2{text-align:center;margin:12px 0 0}
 .me-del2 .linkbtn{color:var(--head);font-weight:600;font-size:14px;min-height:44px}
-.me-ver{text-align:center;margin:4px 0 0;font-size:12px;color:var(--muted,#888)}
 .me-cvd i{display:inline-block;width:22px;height:8px;border-radius:4px}
 .me-cvd i.vdot{width:12px;height:12px;border-radius:50%;margin-right:2px}
 /* Visite sans compte (29/10/2026) : body.guest */
@@ -2055,7 +2054,6 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     <button type="button" class="me-row2 no-guest" id="meOut"><span class="me-lt"><b class="me-out">Se déconnecter</b></span></button>
   </div>
   <p class="me-del2 no-guest"><button type="button" class="linkbtn" id="meDel">Supprimer mon compte</button></p>
-  <p class="me-ver" id="meVer" hidden></p>
 </section>
 <section class="libpage help2" id="helpPage" hidden aria-labelledby="hpTitle">
   <div class="lp-head"><h2 id="hpTitle">Aide</h2><button type="button" class="btn small pg-x">Fermer</button></div>
@@ -9494,16 +9492,6 @@ const DEL = { code: false, email: '' }; // code = confirmation par un code envoy
 function delMode(code) {
   DEL.code = code; $('#delPw').hidden = code; $('#delPw').required = !code; $('#delByCode').hidden = code; $('#delCodeBox').hidden = !code;
 }
-/* Numéro de version de l'app (iPhone / Android), sous « Supprimer mon compte ». Rien sur le web. */
-(async () => {
-  const el = $('#meVer'), C = window.Capacitor;
-  try {
-    if (!el || !C || !C.isNativePlatform || !C.isNativePlatform() || !C.Plugins || !C.Plugins.App) return;
-    const i = await C.Plugins.App.getInfo();
-    el.textContent = T('Version {0}', [i.version + (i.build ? ' (' + i.build + ')' : '')]);
-    el.hidden = false;
-  } catch (e) {}
-})();
 $('#meDel').addEventListener('click', () => {
   $('#delForm').hidden = false; $('#delDone').hidden = true; $('#delErr').hidden = true; delMode(false);
   $('#delPw').value = ''; $('#delCode').value = ''; $('#delGo').disabled = false; $('#delGo').textContent = T('Supprimer définitivement');
