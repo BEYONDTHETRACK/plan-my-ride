@@ -120,8 +120,11 @@ Deno.serve(async (req: Request) => {
 
   // appels depuis l'app : compte actif avec l'accès Plan My Ride
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
-  const { data: who } = await db.auth.getUser(jwt);
-  if (!who?.user) return json({ error: 'auth' }, 401);
+  const { data: who, error: whoErr } = await db.auth.getUser(jwt);
+  if (!who?.user) {
+    let c: Record<string, unknown> = {}; try { c = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (_) { /* jeton illisible */ }
+    return json({ error: 'auth', detail: `${whoErr?.message ?? 'pas de session'} · jeton ${jwt ? jwt.length + ' car.' : 'absent'} · rôle ${c.role ?? '?'} · exp ${c.exp ?? '?'}` }, 401);
+  }
   const uid = who.user.id;
   const { data: me } = await db.from('app_users').select('status,pmr').eq('user_id', uid).maybeSingle();
   if (!me || me.status !== 'active' || !me.pmr) return json({ error: 'forbidden' }, 403);
