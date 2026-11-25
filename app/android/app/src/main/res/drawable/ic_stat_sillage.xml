@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Petite icône des notifications Android (blanche, silhouette du logo Sillage : nuage et soleil), 25/11/2026 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="110" android:viewportHeight="100">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M56,40a17,17 0 1,0 34,0a17,17 0 1,0 -34,0z"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M27,58a15,15 0 1,0 30,0a15,15 0 1,0 -30,0z M24,60h44a9,9 0 0,1 0,18h-44a9,9 0 0,1 0,-18z"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M28,84h5l-3,10h-5z M42,84h5l-3,10h-5z M56,84h5l-3,10h-5z"/>
+</vector>

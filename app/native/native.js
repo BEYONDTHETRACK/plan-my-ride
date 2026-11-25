@@ -194,6 +194,22 @@
   });
 
   // Toucher une notification (Firebase) : ouvre le lien de l'alerte comme un lien profond.
+  // Notification reçue app ouverte (Android ne l'affiche pas dans ce cas) : bandeau en haut de l'écran, 6 s ; le toucher suit le lien.
+  if (P.FirebaseMessaging) P.FirebaseMessaging.addListener('notificationReceived', function (ev) {
+    try {
+      var n = (ev && ev.notification) || {}, d = n.data || {};
+      if (window.SILLAGE_NATIVE !== 'android' || (!n.title && !n.body)) return; // iPhone : bannière native (presentationOptions)
+      var b = document.createElement('div');
+      b.setAttribute('role', 'status');
+      b.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:99999;background:#14201b;color:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.35);font:15px/1.35 system-ui,sans-serif;cursor:pointer';
+      var t = document.createElement('b'); t.textContent = n.title || 'Sillage'; t.style.display = 'block';
+      var m = document.createElement('span'); m.textContent = n.body || '';
+      b.appendChild(t); b.appendChild(m); document.body.appendChild(b);
+      var gone = function () { if (b.parentNode) b.parentNode.removeChild(b); };
+      b.addEventListener('click', function () { gone(); try { var u = new URL(d.url || '/', location.href); if (u.search && u.search !== location.search) location.replace(location.pathname + u.search + (u.hash || '')); } catch (e) {} });
+      setTimeout(gone, 6000);
+    } catch (e) {}
+  });
   if (P.FirebaseMessaging) P.FirebaseMessaging.addListener('notificationActionPerformed', function (ev) {
     try {
       var d = (ev && ev.notification && ev.notification.data) || {}, u = new URL(d.url || '/', location.href), q = u.search;

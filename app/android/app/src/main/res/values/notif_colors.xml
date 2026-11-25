@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- couleur des notifications (jaune Sillage) -->
+    <color name="sillage_notif">#E0A21B</color>
+</resources>
