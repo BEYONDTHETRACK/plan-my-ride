@@ -193,6 +193,14 @@
     } catch (e) {}
   });
 
+  // Toucher une notification (Firebase) : ouvre le lien de l'alerte comme un lien profond.
+  if (P.FirebaseMessaging) P.FirebaseMessaging.addListener('notificationActionPerformed', function (ev) {
+    try {
+      var d = (ev && ev.notification && ev.notification.data) || {}, u = new URL(d.url || '/', location.href), q = u.search;
+      if (q && q !== location.search) location.replace(location.pathname + q + (u.hash || ''));
+    } catch (e) {}
+  });
+
   // ---- Barre d'état : texte clair sur fond sombre, et l'inverse ---------------
   function isDark() {
     var t = document.documentElement.getAttribute('data-theme');

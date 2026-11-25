@@ -9558,10 +9558,13 @@ $('#delForm').addEventListener('submit', async e => {
 /* Alertes météo (essai du 25/10/2026) : notifications Web Push. Le service worker sw.js affiche les notifications ;
    la fonction edge push-alerts garde les abonnements (push_subs) et envoie chaque soir à 20 h (ou matin à 7 h)
    l'alerte du parcours choisi (réglages dans push_alerts, une ligne par compte, écrite ici). */
-const AL = { row: null, sub: null, loaded: false };
+const AL = { row: null, sub: null, tok: null, loaded: false };
 const AL_DAYS = [0, 1, 2, 3, 4, 5, 6].map(i => new Intl.DateTimeFormat(LOC, { weekday: 'narrow' }).format(new Date(2024, 0, 1 + i)).toUpperCase());
 const AL_DAYN = [0, 1, 2, 3, 4, 5, 6].map(i => new Intl.DateTimeFormat(LOC, { weekday: 'long' }).format(new Date(2024, 0, 1 + i)));
-const alCan = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+// App iPhone / Android (25/11/2026) : notifications natives par Firebase (plugin FirebaseMessaging) ; le jeton de l'appareil va dans push_devices.
+const alNat = () => !!(window.SILLAGE_NATIVE && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseMessaging);
+const alFM = () => window.Capacitor.Plugins.FirebaseMessaging;
+const alCan = () => alNat() || ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
 const alIos = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const alStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 function alKeyBytes(b64) { const t = b64.replace(/-/g, '+').replace(/_/g, '/'), p = t + '='.repeat((4 - t.length % 4) % 4); return Uint8Array.from(atob(p), c => c.charCodeAt(0)); }
@@ -9576,7 +9579,14 @@ function alMsg(t) { $('#alMsg').textContent = t || ''; }
 async function alLoad() {
   if (AL.loaded) return; AL.loaded = true;
   try { const sb = await sbIfLogged(); if (sb) { const { data } = await sb.from('push_alerts').select('*').maybeSingle(); AL.row = data || null; } } catch (e) {}
-  try { if (alCan()) { const r = await navigator.serviceWorker.getRegistration('./'); AL.sub = r ? await r.pushManager.getSubscription() : null; } } catch (e) {}
+  if (alNat()) {
+    try {
+      AL.perm = (await alFM().checkPermissions()).receive;
+      if (AL.perm === 'granted' && AL.row && AL.row.enabled) { // jeton rafraîchi à chaque ouverture (il peut changer)
+        const { token } = await alFM().getToken(); await alFn('device_register', { token, platform: window.SILLAGE_NATIVE }); AL.tok = token;
+      }
+    } catch (e) {}
+  } else try { if (alCan()) { const r = await navigator.serviceWorker.getRegistration('./'); AL.sub = r ? await r.pushManager.getSubscription() : null; } } catch (e) {}
   alRender();
 }
 function alDefaults() {
@@ -9586,13 +9596,13 @@ function alDefaults() {
 }
 function alRender() {
   if (!$('#alCard')) return;
-  const why = $('#alWhy'), r = AL.row || alDefaults(), on = !!(AL.row && AL.row.enabled), dev = !!AL.sub && typeof Notification !== 'undefined' && (AL.perm === 'granted' || Notification.permission === 'granted');
+  const why = $('#alWhy'), r = AL.row || alDefaults(), on = !!(AL.row && AL.row.enabled), dev = alNat() ? !!AL.tok && AL.perm === 'granted' : !!AL.sub && typeof Notification !== 'undefined' && (AL.perm === 'granted' || Notification.permission === 'granted');
   if (!alCan()) {
     why.hidden = false;
     why.innerHTML = alIos() && !alStandalone()
       ? T("Sur iPhone, les alertes passent par l'app installée : touche <b>Partager</b> puis <b>Sur l'écran d'accueil</b>, ouvre Sillage depuis cette icône, puis reviens ici (iOS 16.4 ou plus).")
       : T("Ce navigateur ne reçoit pas les notifications. Essaie avec Chrome, Edge, Firefox ou Safari à jour.");
-  } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied' && AL.perm !== 'granted') {
+  } else if (alNat() ? AL.perm === 'denied' : (typeof Notification !== 'undefined' && Notification.permission === 'denied' && AL.perm !== 'granted')) {
     why.hidden = false; why.textContent = T("Les notifications sont bloquées pour Sillage : autorise-les dans les réglages du navigateur (ou de l'app), puis reviens ici.");
   } else why.hidden = true;
   $('#alOn').hidden = !alCan() || dev;
@@ -9640,6 +9650,15 @@ async function alSave(patch) {
 $('#alOn').addEventListener('click', async () => {
   const b = $('#alOn'); b.disabled = true; alMsg('');
   try {
+    if (alNat()) {
+      AL.perm = (await alFM().requestPermissions()).receive;
+      if (AL.perm !== 'granted') { alRender(); alMsg(T("Notifications refusées : rien ne sera envoyé.")); return; }
+      const { token } = await alFM().getToken();
+      await alFn('device_register', { token, platform: window.SILLAGE_NATIVE });
+      AL.tok = token;
+      if (await alSave({ enabled: true })) alMsg(T("C'est prêt : tu recevras la météo de « {0} » {1}. « Envoyer l'alerte maintenant » pour voir à quoi elle ressemble.", [AL.row.route_name || T("ton parcours"), AL.row.notify === 'morn' ? T("le matin à 7 h") : T("la veille à 20 h")]));
+      return;
+    }
     AL.perm = await Notification.requestPermission();
     if (AL.perm !== 'granted') { alRender(); alMsg(T("Notifications refusées : rien ne sera envoyé.")); return; }
     const reg = await alReg(); await navigator.serviceWorker.ready;
@@ -9672,12 +9691,13 @@ $('#alTest').addEventListener('click', async () => {
 });
 $('#alOff').addEventListener('click', async () => {
   alMsg('');
-  try { if (AL.sub) { await alFn('unsubscribe', { endpoint: AL.sub.endpoint }).catch(() => {}); await AL.sub.unsubscribe().catch(() => {}); AL.sub = null; }
+  try { if (AL.tok) { await alFn('device_unregister', { token: AL.tok }).catch(() => {}); AL.tok = null; }
+    if (AL.sub) { await alFn('unsubscribe', { endpoint: AL.sub.endpoint }).catch(() => {}); await AL.sub.unsubscribe().catch(() => {}); AL.sub = null; }
     if (await alSave({ enabled: false })) alMsg(T("Alertes coupées. Tes réglages sont gardés.")); }
   finally { alRender(); }
 });
 // déjà abonné : le service worker reste enregistré (une mise à jour de sw.js est prise au chargement)
-try { if (alCan() && hasSbToken()) navigator.serviceWorker.getRegistration('./').then(r => { if (r) r.update().catch(() => {}); }).catch(() => {}); } catch (e) {}
+try { if (!alNat() && alCan() && hasSbToken()) navigator.serviceWorker.getRegistration('./').then(r => { if (r) r.update().catch(() => {}); }).catch(() => {}); } catch (e) {}
 
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (!document.documentElement.dataset.theme) redrawTheme(); });
 

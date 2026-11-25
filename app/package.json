@@ -2,7 +2,7 @@
   "name": "sillage-app",
   "version": "0.1.0",
   "private": true,
-  "description": "Sillage — app iPhone et Android (Capacitor) construite à partir de index.html",
+  "description": "Sillage \u2014 app iPhone et Android (Capacitor) construite \u00e0 partir de index.html",
   "type": "module",
   "scripts": {
     "build": "node scripts/build-www.mjs",
@@ -14,6 +14,7 @@
     "ios": "cap open ios"
   },
   "dependencies": {
+    "@capacitor-firebase/messaging": "^8.5.2",
     "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",

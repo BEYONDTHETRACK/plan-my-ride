@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { sendPush, vapidGenerate, type VapidKeys, type Sub } from './webpush.ts';
+import { sendFcm, fcmReady } from './fcm.ts';
 import { localParts, zoned, addDays, isoWd, route, weather, ride, verdict, score, tr, LANGS, unitsOf, cv } from './forecast.ts';
 
 // Alertes météo de Plan My Ride (notifications Web Push), depuis le 25/10/2026.
@@ -8,6 +9,8 @@ import { localParts, zoned, addDays, isoWd, route, weather, ride, verdict, score
 //   { action: 'subscribe', sub: PushSubscription, ua } → { ok }        cet appareil reçoit les alertes
 //   { action: 'unsubscribe', endpoint }               → { ok }
 //   { action: 'test' }                                → { ok, sent, title, body }   alerte envoyée tout de suite
+//   { action: 'device_register', token, platform: 'ios' | 'android' } → { ok }   jeton Firebase de l'app (notification native)
+//   { action: 'device_unregister', token }            → { ok }
 // POST { action: 'cron' } avec l'en-tête x-cron-token (table push_keys) : appelé chaque heure par pg_cron ;
 // envoie l'alerte de chaque compte à son heure (la veille à 20 h ou le jour même à 7 h, heure locale).
 // Clés VAPID créées au premier appel et gardées dans push_keys (clé de service seulement, jamais dans le dépôt).
@@ -72,7 +75,17 @@ async function deliver(db: Admin, keys: VapidKeys, userId: string, msg: Record<s
     else if (st === 404 || st === 410) await db.from('push_subs').delete().eq('id', s.id); // abonnement expiré
     else await db.rpc('push_sub_fail', { sid: s.id }).then(() => {}, () => {});
   }
-  return { sent, devices: (subs ?? []).length };
+  // apps iPhone / Android : notification native par Firebase (jetons de push_devices)
+  const { data: devs } = await db.from('push_devices').select('id,token,fails').eq('user_id', userId);
+  for (const d of devs ?? []) {
+    let st = 0;
+    try { st = await sendFcm(d.token as string, msg); } catch (_) { st = 0; }
+    if (st >= 200 && st < 300) { sent++; await db.from('push_devices').update({ last_ok_at: new Date().toISOString(), fails: 0 }).eq('id', d.id); }
+    else if (st === 404 || st === 400) await db.from('push_devices').delete().eq('id', d.id); // jeton périmé (app désinstallée)
+    else if ((d.fails as number) >= 5) await db.from('push_devices').delete().eq('id', d.id);
+    else await db.from('push_devices').update({ fails: ((d.fails as number) || 0) + 1 }).eq('id', d.id);
+  }
+  return { sent, devices: (subs ?? []).length + (devs ?? []).length };
 }
 
 Deno.serve(async (req: Request) => {
@@ -121,6 +134,18 @@ Deno.serve(async (req: Request) => {
     if (!/^https:\/\//.test(ep) || ep.length > 1000 || !/^[\w-]{80,100}$/.test(p) || !/^[\w-]{16,40}$/.test(au)) return json({ error: 'sub' }, 400);
     const { error } = await db.from('push_subs').upsert({ user_id: uid, endpoint: ep, p256dh: p, auth: au, ua: String(body.ua ?? '').slice(0, 200), fails: 0 }, { onConflict: 'endpoint' });
     if (error) return json({ error: 'save', detail: error.message.slice(0, 200) }, 500);
+    return json({ ok: true });
+  }
+  if (action === 'device_register') {
+    const tok = String(body.token ?? ''), pf = String(body.platform ?? '');
+    if (!fcmReady()) return json({ error: 'fcm', detail: 'FCM_SERVICE_ACCOUNT manquant' }, 503);
+    if (!/^[\w:.\-]{50,400}$/.test(tok) || !['ios', 'android'].includes(pf)) return json({ error: 'device' }, 400);
+    const { error } = await db.from('push_devices').upsert({ user_id: uid, token: tok, platform: pf, fails: 0 }, { onConflict: 'token' });
+    if (error) return json({ error: 'save', detail: error.message.slice(0, 200) }, 500);
+    return json({ ok: true });
+  }
+  if (action === 'device_unregister') {
+    await db.from('push_devices').delete().eq('user_id', uid).eq('token', String(body.token ?? ''));
     return json({ ok: true });
   }
   if (action === 'unsubscribe') {

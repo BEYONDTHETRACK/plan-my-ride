@@ -29,6 +29,13 @@
         "twitter": false
       },
       "logLevel": 1
+    },
+    "FirebaseMessaging": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
     }
   }
 }
