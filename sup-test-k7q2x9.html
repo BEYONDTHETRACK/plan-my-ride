@@ -259,7 +259,7 @@ dialog h2{margin-bottom:6px}
   .acc tr.u{display:grid;grid-template-columns:1fr auto;gap:8px 10px;padding:12px 16px}
   .acc tr.u td{padding:0}
   .acc tr.u td.c-who{grid-column:1}.acc tr.u td.c-more{grid-column:2;grid-row:1}
-  .acc tr.u td.c-st,.acc tr.u td.c-mb,.acc tr.u td.c-act,.acc tr.u td.c-rt{grid-column:1 / -1}
+  .acc tr.u td.c-st,.acc tr.u td.c-mb,.acc tr.u td.c-act,.acc tr.u td.c-dev,.acc tr.u td.c-rt{grid-column:1 / -1}
   .acc tr.u td.c-rt{text-align:left}.acc tr.u td.c-rt::after{content:' parcours';font-weight:400;color:var(--muted)}
   .acc tr.ux{display:block}.acc tr.ux td{display:block;padding:0 16px 14px}
   .gmap{height:320px;flex-basis:100%}
@@ -386,7 +386,7 @@ dialog h2{margin-bottom:6px}
           </div>
           <div style="overflow-x:auto">
             <table class="acc">
-              <thead><tr><th scope="col">Compte</th><th scope="col">Statut</th><th scope="col">Open-Meteo aujourd'hui</th><th scope="col">Activité</th><th scope="col" class="num">Parcours</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+              <thead><tr><th scope="col">Compte</th><th scope="col">Statut</th><th scope="col">Open-Meteo aujourd'hui</th><th scope="col">Activité</th><th scope="col">Appareil</th><th scope="col" class="num">Parcours</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
               <tbody id="users"></tbody>
             </table>
           </div>
@@ -561,7 +561,7 @@ async function load(){
     sb.from('app_users').select('*').order('created_at', { ascending: true }),
     sb.from('tester_links').select('*').order('created_at', { ascending: false }),
     sb.from('usage_log').select('user_id,at,kind,credits').order('at', { ascending: false }).limit(10000),
-    sb.from('activity_log').select('user_id,at,event,detail,km,device,mode,route_id').order('at', { ascending: false }).limit(10000),
+    sb.from('activity_log').select('user_id,at,event,detail,km,device,mode,route_id,platform').order('at', { ascending: false }).limit(10000),
     sb.from('pmr_visits').select('at,visitor,event,mode,device,km,country,region,dept,city').order('at', { ascending: false }).limit(5000),
     sb.functions.invoke('admin-users', { body: { action: 'list' } }).catch(e => ({ error: e })),
     // abonnement Open-Meteo « API Standard » (29/10/2026) : compteur du relais open-meteo, mois en cours
@@ -664,6 +664,20 @@ function actCell(u){
   return '<div class="act"><b>' + ago(last) + '</b>' + (old && last ? '<span class="old">pas revenu·e cette semaine</span>'
     : '<span>' + opens7 + ' ouverture' + (opens7 > 1 ? 's' : '') + ' en 7 j</span>') + '</div>';
 }
+// Appareil utilisé (25/11/2026) : plateforme de chaque ouverture (app iPhone / app Android / web), du plus récent au plus ancien.
+// Avant cette date, seul « téléphone / ordinateur » est connu : un téléphone peut être l'app ou le web.
+function devLabel(e){
+  if (e.platform === 'ios') return 'App iPhone';
+  if (e.platform === 'android') return 'App Android';
+  if (e.platform === 'web') return e.device === 'mobile' ? 'Web · téléphone' : 'Web · ordinateur';
+  return e.device === 'mobile' ? 'Téléphone (app ou web ?)' : e.device === 'desktop' ? 'Web · ordinateur' : '';
+}
+function devCell(u){
+  const seen = [], n = {};
+  for (const e of S.evAll) { if (e.user_id !== u.user_id) continue; const l = devLabel(e); if (!l) continue; if (!(l in n)) { n[l] = 0; seen.push(l); } n[l]++; }
+  if (!seen.length) return '<span class="muted">—</span>';
+  return '<div class="act"><b>' + esc(seen[0]) + '</b>' + (seen.length > 1 ? '<span>aussi : ' + esc(seen.slice(1, 3).join(', ')) + '</span>' : '') + '</div>';
+}
 function statusBadge(u){
   if (u.status === 'blocked') return '<span class="badge blocked">Bloqué</span>';
   if (u.status === 'pending') return '<span class="badge pending">En attente</span>';
@@ -681,11 +695,12 @@ function userRows(u){
     + '<td class="c-st">' + statusBadge(u) + '</td>'
     + '<td class="c-mb">' + omCell(u) + '</td>'
     + '<td class="c-act">' + actCell(u) + '</td>'
+    + '<td class="c-dev">' + devCell(u) + '</td>'
     + '<td class="c-rt num"><b>' + (a.routes || 0) + '</b></td>'
     + '<td class="c-more" style="text-align:right"><button type="button" class="more" data-a="more" aria-expanded="' + open + '" aria-label="Actions pour ' + esc(short(u)) + '">⋯</button></td></tr>';
   if (!open) return h;
   const mine = S.ev.filter(e => e.user_id === u.user_id), gpx = mine.filter(e => e.event === 'gpx'), use = S.use[u.user_id] || { mb: 0, cr: 0 };
-  h += '<tr class="ux" data-id="' + u.user_id + '"><td colspan="6"><div class="uxbtns">'
+  h += '<tr class="ux" data-id="' + u.user_id + '"><td colspan="7"><div class="uxbtns">'
     + (S.pwOpen === u.user_id ? '' : '<button type="button" class="b sm" data-a="pw">Changer le mot de passe</button>')
     + '<span class="qbox">Quota Open-Meteo <input type="number" min="0" max="1000000" step="100" data-q="quota_om" value="' + (u.quota_om == null ? '' : u.quota_om) + '" placeholder="∞" aria-label="Quota Open-Meteo par jour"> appels / jour</span>'
     + '<label class="tgl"><input type="checkbox" data-k="pmr"' + (u.pmr ? ' checked' : '') + '> Accès Sillage</label>'
@@ -707,7 +722,7 @@ function renderUsers(){
     && (!q || (u.prenom || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)));
   rest.sort((a, b) => (lastSeen(b.user_id) || '') < (lastSeen(a.user_id) || '') ? -1 : 1);
   $('allN').textContent = S.users.filter(u => u.status !== 'pending').length;
-  $('users').innerHTML = rest.map(userRows).join('') || '<tr><td colspan="6" class="empty" style="padding:16px 20px">Aucun compte.</td></tr>';
+  $('users').innerHTML = rest.map(userRows).join('') || '<tr><td colspan="7" class="empty" style="padding:16px 20px">Aucun compte.</td></tr>';
 }
 function renderPend(){
   const pend = S.users.filter(u => u.status === 'pending');
@@ -747,7 +762,7 @@ function renderEvents(){
     : e.event === 'out' ? '<span class="tag">Mes sorties</span>'
     : e.event === 'wx' ? '<span class="tag wx">Météo</span>' + esc(wxLabel(e.detail)) + (e.mode ? ' · ' + MODE_NAME[e.mode] : '') : esc(e.event);
   $('evBody').innerHTML = rows.map(e => '<tr><td style="white-space:nowrap">' + dtFmt.format(new Date(e.at)) + '</td><td>' + esc(uName(e.user_id)) + '</td><td>' + lab(e) + '</td>'
-    + '<td class="num">' + (e.km ? Math.round(e.km) : '') + '</td><td>' + (e.device === 'mobile' ? 'Téléphone' : e.device === 'desktop' ? 'Ordinateur' : '') + '</td></tr>').join('')
+    + '<td class="num">' + (e.km ? Math.round(e.km) : '') + '</td><td>' + esc(devLabel(e)) + '</td></tr>').join('')
     || '<tr><td colspan="5" class="empty" style="padding:14px 20px">Rien sur cette période.</td></tr>';
 }
 function render(){
@@ -1441,7 +1456,7 @@ async function init(){
   if (!me || !me.is_admin || me.status !== 'active'){ deny('Cette page est réservée aux administrateurs.'); return; }
   $('app').hidden = false;
   setTab(hashTab());
-  try { await load(); } catch(e){ $('users').innerHTML = '<tr><td colspan="6" class="msg err" style="padding:14px 20px">Lecture impossible : ' + esc(e.message || e) + '</td></tr>'; }
+  try { await load(); } catch(e){ $('users').innerHTML = '<tr><td colspan="7" class="msg err" style="padding:14px 20px">Lecture impossible : ' + esc(e.message || e) + '</td></tr>'; }
   gLoad().catch(e => { $('glist').innerHTML = '<li class="muted">Carte : ' + esc(e.message || e) + '</li>'; });
   mbBalance();
   pLoad().catch(e => { P.loaded = true; P.err = e.message || String(e); pRender(); });
