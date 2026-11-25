@@ -120,12 +120,13 @@ Deno.serve(async (req: Request) => {
 
   // appels depuis l'app : compte actif avec l'accès Plan My Ride
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
-  const { data: who, error: whoErr } = await db.auth.getUser(jwt);
-  if (!who?.user) {
-    let c: Record<string, unknown> = {}; try { c = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (_) { /* jeton illisible */ }
-    return json({ error: 'auth', detail: `${whoErr?.message ?? 'pas de session'} · jeton ${jwt ? jwt.length + ' car.' : 'absent'} · rôle ${c.role ?? '?'} · exp ${c.exp ?? '?'}` }, 401);
-  }
-  const uid = who.user.id;
+  // jeton vérifié par l'API d'authentification (db.auth.getUser(jwt) répond « Auth session missing » avec ce client)
+  let uid = '';
+  try {
+    const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, { headers: { Authorization: `Bearer ${jwt}`, apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')! } });
+    if (r.ok) uid = String((await r.json()).id ?? '');
+  } catch (_) { /* réseau */ }
+  if (!uid) return json({ error: 'auth' }, 401);
   const { data: me } = await db.from('app_users').select('status,pmr').eq('user_id', uid).maybeSingle();
   if (!me || me.status !== 'active' || !me.pmr) return json({ error: 'forbidden' }, 403);
 
