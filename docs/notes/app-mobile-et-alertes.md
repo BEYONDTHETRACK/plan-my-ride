@@ -26,3 +26,9 @@ Notes détaillées de Sillage, sorties de CLAUDE.md le 23/11/2026 (texte d'origi
 - Alertes personnelles → un jeton FCM par appareil, table `push_devices` (`supabase/sql/2026-11-25_push_devices.sql`, RLS sans politique). `push-alerts` envoie aux abonnements Web Push ET aux jetons FCM (`fcm.ts`, HTTP v1, secret `FCM_SERVICE_ACCOUNT` = JSON du compte de service). Actions `device_register` / `device_unregister`. Jeton supprimé si FCM répond 404/400 ou après 5 échecs.
 - Client (`alNat()` dans test.html) : dans l'app, `alOn` demande la permission, récupère le jeton et l'enregistre ; le jeton est ré-enregistré à chaque ouverture si l'alerte est active. Toucher la notification ouvre son `url` (`native.js`).
 - iOS : `FirebaseApp.configure()`, transmission du jeton APNs, `aps-environment` (development ; Xcode le passe en production à l'archivage), `UIBackgroundModes` remote-notification. Clé APNs .p8 à téléverser dans Firebase › Cloud Messaging.
+
+### Notifications envoyées à la main (25/11/2026)
+- Supervision test (`sup-test-k7q2x9.html#notifications`), onglet « Notifications » : nombre d'appareils joignables (iPhone, Android, navigateurs), formulaire (titre 80 car., message 300 car., lien facultatif vers l'app, « Tout le monde » avec un second clic de confirmation ou un seul compte par e-mail, choix des appareils), historique des 30 derniers envois.
+- Fonction `push-alerts` (v13) : actions `admin_reach` et `admin_send`, réservées aux admins actifs (`app_users.is_admin`). Envoi Web Push (`push_subs`) et FCM (`push_devices`) ; jetons morts supprimés. Lien forcé sur `https://app.sillage-ride.eu/` s'il pointe ailleurs.
+- Table `push_broadcasts` (historique, lecture admin par RLS) : `supabase/sql/2026-11-25_push_broadcasts.sql`.
+- À reporter dans `sup-k7q2x9.html` quand Antoine valide.

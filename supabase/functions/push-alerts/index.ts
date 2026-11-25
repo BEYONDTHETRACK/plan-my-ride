@@ -11,6 +11,9 @@ import { localParts, zoned, addDays, isoWd, route, weather, ride, verdict, score
 //   { action: 'test' }                                → { ok, sent, title, body }   alerte envoyée tout de suite
 //   { action: 'device_register', token, platform: 'ios' | 'android' } → { ok }   jeton Firebase de l'app (notification native)
 //   { action: 'device_unregister', token }            → { ok }
+// Administrateurs (app_users.is_admin) seulement, depuis la supervision :
+//   { action: 'admin_reach' }                          → { ok, ios, android, web, users }   appareils joignables
+//   { action: 'admin_send', title, body, url?, to: 'all' | e-mail, platforms: ['ios','android','web'] } → { ok, devices, sent }
 // POST { action: 'cron' } avec l'en-tête x-cron-token (table push_keys) : appelé chaque heure par pg_cron ;
 // envoie l'alerte de chaque compte à son heure (la veille à 20 h ou le jour même à 7 h, heure locale).
 // Clés VAPID créées au premier appel et gardées dans push_keys (clé de service seulement, jamais dans le dépôt).
@@ -88,6 +91,32 @@ async function deliver(db: Admin, keys: VapidKeys, userId: string, msg: Record<s
   return { sent, devices: (subs ?? []).length + (devs ?? []).length };
 }
 
+// Envoi d'un message libre (supervision) aux appareils des comptes visés, filtrés par plateforme.
+async function broadcast(db: Admin, keys: VapidKeys, users: string[] | null, pf: string[], msg: Record<string, unknown>) {
+  let devices = 0, sent = 0;
+  const ids = (q: any) => users ? q.in('user_id', users) : q;
+  if (pf.includes('web')) {
+    const { data: subs } = await ids(db.from('push_subs').select('id,endpoint,p256dh,auth'));
+    for (const s of subs ?? []) {
+      devices++; let st = 0;
+      try { st = await sendPush(s as Sub, msg, keys, SUBJECT); } catch (_) { st = 0; }
+      if (st >= 200 && st < 300) sent++;
+      else if (st === 404 || st === 410) await db.from('push_subs').delete().eq('id', s.id);
+    }
+  }
+  const nat = pf.filter(p => p === 'ios' || p === 'android');
+  if (nat.length) {
+    const { data: devs } = await ids(db.from('push_devices').select('id,token').in('platform', nat));
+    for (const d of devs ?? []) {
+      devices++; let st = 0;
+      try { st = await sendFcm(d.token as string, msg); } catch (_) { st = 0; }
+      if (st >= 200 && st < 300) sent++;
+      else if (st === 404 || st === 400) await db.from('push_devices').delete().eq('id', d.id);
+    }
+  }
+  return { devices, sent };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'method' }, 405);
@@ -129,6 +158,38 @@ Deno.serve(async (req: Request) => {
   if (!uid) return json({ error: 'auth' }, 401);
   const { data: me } = await db.from('app_users').select('status,pmr').eq('user_id', uid).maybeSingle();
   if (!me || me.status !== 'active' || !me.pmr) return json({ error: 'forbidden' }, 403);
+
+  if (action === 'admin_reach' || action === 'admin_send') {
+    const { data: ad } = await db.from('app_users').select('is_admin,status').eq('user_id', uid).maybeSingle();
+    if (!ad?.is_admin || ad.status !== 'active') return json({ error: 'forbidden' }, 403);
+    if (action === 'admin_reach') {
+      const { data: dv } = await db.from('push_devices').select('user_id,platform');
+      const { data: ws } = await db.from('push_subs').select('user_id');
+      const u = new Set([...(dv ?? []).map(d => d.user_id), ...(ws ?? []).map(w => w.user_id)]);
+      return json({ ok: true, ios: (dv ?? []).filter(d => d.platform === 'ios').length, android: (dv ?? []).filter(d => d.platform === 'android').length, web: (ws ?? []).length, users: u.size });
+    }
+    const title = String(body.title ?? '').trim().slice(0, 80), text = String(body.body ?? '').trim().slice(0, 300);
+    let url = String(body.url ?? '').trim(); if (!url.startsWith(SITE)) url = SITE;
+    const pf = (Array.isArray(body.platforms) ? body.platforms : []).map(String).filter(p => ['ios', 'android', 'web'].includes(p));
+    if (!title || !text) return json({ error: 'texte', detail: 'titre et message obligatoires' }, 400);
+    if (!pf.length) return json({ error: 'platforms', detail: 'choisis au moins un type d\'appareil' }, 400);
+    const to = String(body.to ?? 'all').trim().toLowerCase();
+    let users: string[] | null = null;
+    if (to !== 'all') {
+      let id = '';
+      for (let page = 1; page <= 10 && !id; page++) {
+        const { data } = await db.auth.admin.listUsers({ page, perPage: 200 });
+        const f = data?.users.find(x => (x.email ?? '').toLowerCase() === to); if (f) id = f.id;
+        if (!data || data.users.length < 200) break;
+      }
+      if (!id) return json({ error: 'email', detail: 'aucun compte avec cet e-mail' }, 404);
+      users = [id];
+    }
+    const msg = { title, body: text, url, tag: 'sillage-news-' + Date.now() };
+    const r = await broadcast(db, await vapid(db), users, pf, msg);
+    await db.from('push_broadcasts').insert({ sent_by: uid, title, body: text, url, target: to === 'all' ? 'all' : to, platforms: pf, devices: r.devices, sent: r.sent });
+    return json({ ok: true, ...r });
+  }
 
   if (action === 'key') return json({ ok: true, key: (await vapid(db)).pub });
 
