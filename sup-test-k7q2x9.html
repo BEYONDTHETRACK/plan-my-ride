@@ -79,6 +79,9 @@ h1{margin:0;font-family:var(--f-display);font-weight:800;font-size:44px;letter-s
 .td .ok{font-size:14px;color:var(--ok);font-weight:600}
 .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
 #aKpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+.nemo{display:flex;flex-wrap:wrap;gap:4px;margin-top:-4px}
+.nemo button{min-width:40px;min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:20px;line-height:1;cursor:pointer;padding:0}
+.nemo button:hover{background:var(--surface-2)}
 #nReach{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}
 .kpi .l{font-size:13px;color:var(--muted);font-weight:600}
@@ -489,6 +492,7 @@ dialog h2{margin-bottom:6px}
         <form class="form" id="nForm" autocomplete="off" style="max-width:560px">
           <label class="f">Titre<input class="in" id="nTitle" maxlength="80" required placeholder="ex. Nouveauté dans Sillage"></label>
           <label class="f">Message<textarea class="in" id="nBody" maxlength="300" rows="3" required style="padding:10px 12px;min-height:84px;font:inherit;resize:vertical"></textarea><span class="muted" id="nCount" style="font-weight:400">0 / 300</span></label>
+          <div class="nemo" id="nEmo" role="group" aria-label="Ajouter un emoji (dans le titre ou le message, là où est le curseur)"></div>
           <label class="f">Lien ouvert au toucher (facultatif, une adresse de l'app)<input class="in" id="nUrl" maxlength="300" placeholder="https://app.sillage-ride.eu/"></label>
           <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:6px"><legend class="muted" style="font-size:13px;font-weight:600;padding:0;margin-bottom:4px">Envoyer à</legend>
             <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="radio" name="nTo" value="all" checked> Tout le monde</label>
@@ -1484,6 +1488,18 @@ async function nLoad(){
     : data.map(b => '<tr><td>' + esc(dsFmt.format(new Date(b.created_at))) + ' ' + esc(new Date(b.created_at).toTimeString().slice(0, 5)) + '</td><td><b>' + esc(b.title) + '</b><br><span class="muted">' + esc(b.body) + '</span></td><td>' + esc(b.target === 'all' ? 'Tout le monde' : b.target) + '<br><span class="muted">' + esc((b.platforms || []).map(p => nPlat[p] || p).join(', ')) + '</span></td><td class="num">' + esc(b.sent) + ' / ' + esc(b.devices) + '</td></tr>').join('');
 }
 const nTo = () => document.querySelector('input[name="nTo"]:checked').value;
+// Emojis (25/11/2026) : un clic insère l'emoji à la place du curseur, dans le titre ou le message (le dernier champ touché).
+const N_EMO = ['👋','🚴','🚵','☀️','🌤️','⛅','🌧️','⛈️','❄️','💨','🌡️','⚠️','🎉','🔥','✨','💪','🏔️','🗺️','📍','🔔','🆕','✅','❤️','🙏'];
+let nLast = $('nBody');
+$('nTitle').addEventListener('focus', () => { nLast = $('nTitle'); });
+$('nBody').addEventListener('focus', () => { nLast = $('nBody'); });
+$('nEmo').innerHTML = N_EMO.map(e => '<button type="button" title="Ajouter ' + e + '">' + e + '</button>').join('');
+$('nEmo').addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); }); // garde le curseur dans le champ
+$('nEmo').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+  const f = nLast, a = f.selectionStart ?? f.value.length, z = f.selectionEnd ?? a, add = b.textContent;
+  if (f.maxLength > 0 && f.value.length - (z - a) + add.length > f.maxLength) return;
+  f.value = f.value.slice(0, a) + add + f.value.slice(z); f.focus(); f.setSelectionRange(a + add.length, a + add.length);
+  f.dispatchEvent(new Event('input')); });
 $('nBody').addEventListener('input', () => { $('nCount').textContent = $('nBody').value.length + ' / 300'; });
 document.querySelectorAll('input[name="nTo"]').forEach(r => r.addEventListener('change', () => { $('nEmail').hidden = nTo() !== 'one'; $('nEmail').required = nTo() === 'one'; $('nSure').hidden = true; }));
 async function nSend(){
