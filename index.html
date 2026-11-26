@@ -8358,7 +8358,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.b
 $('#tabLib').addEventListener('click', lpOpen);
 /* Page « Mes parcours » (essai du 24/10/2026) : liste des parcours en fiches (miniature du tracé, km, D+, dernière ouverture),
    recherche, tri, ouvrir / renommer / supprimer. Onglet « Parcours » sur téléphone, bouton « Voir tous mes parcours » ailleurs. */
-const LP = { sort: 'recent', kind: 'all', open: '', ren: '', del: '', delT: 0, thumbs: null, fetching: false, maps: {}, mapsLoaded: false, mapsBusy: 0, mapsFail: new Map(), sheet: '', press: null };
+const LP = { sort: (() => { try { const v = localStorage.getItem('pmr-lp-sort'); return ['recent', 'km', 'name'].includes(v) ? v : 'recent'; } catch (e) { return 'recent'; } })(), // tri gardé (pmr-lp-sort, 26/11/2026)
+  kind: 'all', open: '', ren: '', del: '', delT: 0, thumbs: null, fetching: false, maps: {}, mapsLoaded: false, mapsBusy: 0, mapsFail: new Map(), sheet: '', press: null };
 function lpThumbs() { if (!LP.thumbs) { try { LP.thumbs = JSON.parse(localStorage.getItem('pmr-thumbs') || '{}') || {}; } catch (e) { LP.thumbs = {}; } } return LP.thumbs; }
 function thumbOf(pts) { // tracé ramené dans un carré de 64 (projection simple, ~90 points)
   const step = Math.max(1, Math.floor(pts.length / 90)), q = []; for (let i = 0; i < pts.length; i += step) q.push(pts[i]); q.push(pts[pts.length - 1]);
@@ -8601,7 +8602,7 @@ $('#outPage').addEventListener('click', e => { const b = e.target.closest('butto
 $('#libPageX').addEventListener('click', lpClose);
 for (const a of document.querySelectorAll('.modes a, .tabbar a[data-mode]')) a.addEventListener('click', pageClose);
 $('#lpQ').addEventListener('input', () => { LP.open = LP.ren = ''; lpRender(); });
-$('#lpSort').addEventListener('change', () => { LP.sort = $('#lpSort').value; lpRender(); });
+$('#lpSort').addEventListener('change', () => { LP.sort = $('#lpSort').value; try { localStorage.setItem('pmr-lp-sort', LP.sort); } catch (e) {} lpRender(); });
 $('#lpKind').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; LP.kind = b.dataset.v; LP.open = LP.ren = LP.del = ''; lpRender(); });
 $('#lpList').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
