@@ -106,8 +106,9 @@ export function verdict(s: Stats, lang = 'fr', u: Units = { mi: false, f: false 
   const T = (k: string, a?: (string | number)[]) => tr(lang, k, a, u);
   const neg: string[] = [], pos: string[] = [];
   if (s.rain >= 10) neg.push(T('grosse pluie ({0} mm)', [cv.r(u, s.rain)])); else if (s.rain >= 3) neg.push(T('pluie ({0} mm)', [cv.r(u, s.rain)])); else if (s.rain >= 0.3) neg.push(T('quelques gouttes'));
-  if (s.head >= 8 || s.headPct >= 50) neg.push(T('vent de face ({0} km/h en moyenne)', [cv.v(u, Math.max(0, s.head))]));
-  else if (s.head <= -8 || s.tailPct >= 50) pos.push(T('vent dans le dos'));
+  // vent de face / dans le dos : seulement à partir de 10 km/h en moyenne (26/11/2026, demande d'Antoine : « 4 km/h » n'apporte rien)
+  if (s.head >= 10) neg.push(T('vent de face ({0} km/h en moyenne)', [cv.v(u, Math.max(0, s.head))]));
+  else if (s.head <= -10) pos.push(T('vent dans le dos'));
   if (s.gust >= GUST_WARN) neg.push(T('rafales à {0} km/h', [cv.v(u, s.gust)]));
   if (s.amin < 3) neg.push(T('froid')); else if (s.amin < 8) neg.push(T('fraîcheur')); else if (s.amax > 34) neg.push(T('canicule')); else if (s.amax > 30) neg.push(T('chaleur'));
   const list = (a: string[]) => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + T(' et ') + a[a.length - 1];
