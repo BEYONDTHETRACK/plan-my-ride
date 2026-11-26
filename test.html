@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<script>try{if(window.SILLAGE_DEMO_WEB||/[?&]demoweb=1\b/.test(location.search))document.documentElement.classList.add('demo-web');window.SB_TOKEN_NAME=document.documentElement.classList.contains('demo-web')?'sb-sillage-demo-auth-token':'sb-bsypkdsnhiepvcnhmfsm-auth-token';}catch(e){window.SB_TOKEN_NAME='sb-bsypkdsnhiepvcnhmfsm-auth-token';}</script>
+<script>try{if(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform())document.documentElement.classList.add('native')}catch(e){}try{if(window.SILLAGE_DEMO_WEB||/[?&]demoweb=1\b/.test(location.search))document.documentElement.classList.add('demo-web');window.SB_TOKEN_NAME=document.documentElement.classList.contains('demo-web')?'sb-sillage-demo-auth-token':'sb-bsypkdsnhiepvcnhmfsm-auth-token';}catch(e){window.SB_TOKEN_NAME='sb-bsypkdsnhiepvcnhmfsm-auth-token';}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <script>/* thème choisi (clair / sombre), sinon celui de l'appareil ; appliqué avant l'affichage */try{var t=localStorage.getItem('pmr-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
@@ -989,6 +989,8 @@ details[open]>summary .me-chev{transform:rotate(90deg)}
 .me-cvd i.vdot{width:12px;height:12px;border-radius:50%;margin-right:2px}
 /* Visite sans compte (29/10/2026) : body.guest */
 body.guest .no-guest{display:none!important}
+/* hors ligne (cartes des traces, packs de points par pays) : app iPhone / Android seulement, pas sur le web (26/11/2026) */
+html:not(.native) .app-only{display:none!important}
 body:not(.guest) .guest-only{display:none!important}
 /* Compte gratuit (30/10/2026) : body.free ; démo ou gratuit : body.lim */
 body.lim .no-lim{display:none!important}
@@ -1968,7 +1970,7 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     <div class="lp-dacts no-guest">
       <button type="button" data-act="ren"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4"/></svg>Renommer</button>
       <button type="button" data-act="rev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M7 17h10M4 4l3 3-3 3M20 14l-3 3 3 3"/></svg>Inverser le sens<span class="r" id="lpDlgRev"></span></button>
-      <button type="button" data-act="oc" id="lpDlgOc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg><span class="ocl">Garder la carte hors ligne</span><span class="r"></span></button>
+      <button type="button" data-act="oc" id="lpDlgOc" class="app-only"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg><span class="ocl">Garder la carte hors ligne</span><span class="r"></span></button>
       <button type="button" data-act="gpx"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exporter le GPX</button>
       <button type="button" data-act="del" class="danger" id="lpDlgDel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Supprimer<span class="r">deux appuis</span></button>
     </div>
@@ -2031,14 +2033,14 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
       </details>
       <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
     </div></div>
-  <div class="me-card no-guest" id="meOcCard"><h3>Cartes de mes traces, hors ligne</h3>
+  <div class="me-card no-guest app-only" id="meOcCard"><h3>Cartes de mes traces, hors ligne</h3>
     <p class="hint">Le fond de carte, le relief et les points utiles à 15 km de chaque trace gardée, de plus en plus détaillés près du tracé. Tu les gardes depuis la carte d'une sortie ou depuis Mes parcours.</p>
     <p class="hint" id="meOcSum"></p>
     <div class="oc-bar" id="meOcBar" hidden><i></i></div>
     <div class="pk-rows" id="meOcRows"></div>
     <label class="arrows-toggle"><input type="checkbox" id="meOcWifi"> Seulement en Wi-Fi</label>
     <p class="hint al-msg" id="meOcMsg" aria-live="polite"></p></div>
-  <div class="me-card no-guest" id="meOffCard"><h3>Cartes hors ligne</h3>
+  <div class="me-card no-guest app-only" id="meOffCard"><h3>Cartes hors ligne</h3>
     <p class="hint">Les points utiles (eau, ravitos, hébergements…) et les villes, gardés sur ton téléphone pays par pays : la Carte et Ultra marchent alors sans réseau.</p>
     <p class="hint" id="meOffSum"></p>
     <div class="pk-rows" id="meOffRows"></div>
@@ -2308,8 +2310,8 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
         <h2>Carte météo du parcours</h2>
         <button class="btn small" id="mapOptsBtn" type="button" aria-pressed="false">Affichage</button>
         <button class="btn small" id="fsBtn" type="button" title="Afficher la carte en plein écran">Plein écran</button>
-        <button class="btn small no-guest" id="ocZoneBtn" type="button" aria-pressed="false" title="Montre la zone de carte que tu auras sans réseau">Zone hors ligne</button>
-        <button class="btn small primary no-guest" id="ocGetBtn" type="button">Garder la carte</button>
+        <button class="btn small no-guest app-only" id="ocZoneBtn" type="button" aria-pressed="false" title="Montre la zone de carte que tu auras sans réseau">Zone hors ligne</button>
+        <button class="btn small primary no-guest app-only" id="ocGetBtn" type="button">Garder la carte</button>
         <button class="btn small" id="exportImg" type="button" title="Image PNG de la carte (vue actuelle) avec le vent, et du profil météo">Exporter l'image</button>
         <label class="arrows-toggle"><input type="checkbox" id="arrowsOn" checked> Flèches de vent</label>
         <label class="arrows-toggle"><input type="checkbox" id="skyOn" checked> Ciel</label>
@@ -9955,6 +9957,8 @@ async function pmFromBase(k) {
    de 0,3°) et rangé par carrés de 0,1° en mémoire. Ordre : base Sillage, packs, Overpass. Compte gratuit : un seul pays
    hors ligne, choisi dans le panneau d'avertissement d'Ultra (pkWarn), pas de téléchargement automatique. */
 const PK_ON = true; // aussi dans l'app (page index.html)
+const IS_NATIVE = document.documentElement.classList.contains('native') || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+if (IS_NATIVE) document.documentElement.classList.add('native');
 const PK_URL = SB_URL + '/functions/v1/poi-pack?f=';
 const PK = { idx: null, at: 0, q: 4, cell: new Map(), noCells: true, blobs: new Map(), tiles: new Map(), done: new Set(), scans: new Map(), stored: null };
 function pkPrep(idx) {
@@ -10243,6 +10247,7 @@ function ocUI() {
   ocMeRender();
 }
 async function ocStart(id) {
+  if (!IS_NATIVE) return; // carte hors ligne : app seulement (26/11/2026)
   if (OC.busy) { toast(T("Un téléchargement est déjà en cours.")); return; }
   if (ocLocked()) { plusDlg(T("La carte hors ligne d'une trace est réservée à Sillage.cc +.")); return; }
   const r = LIB.list.find(x => x.id === id), pts = await ocPtsOf(id);
@@ -10652,7 +10657,7 @@ async function pmOpen() {
       if (!PM.src.usr) { PM.src.usr = true; const sb = $('#pmSrcUsr'); if (sb) sb.setAttribute('aria-pressed', 'true'); }
       PM.usr.set(fo.poi.id, fo); pmRender(); pmShow(fo);
     }
-    else if (PK_ON && S.mode === 'ultra') pkWarn().catch(() => {}); // trace Ultra : pays sans pack sur l'appareil
+    else if (PK_ON && IS_NATIVE && S.mode === 'ultra') pkWarn().catch(() => {}); // hors ligne : app seulement (26/11/2026) // trace Ultra : pays sans pack sur l'appareil
   }, 30);
 }
 $('#tabMap').addEventListener('click', pmOpen);
