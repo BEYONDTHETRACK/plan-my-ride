@@ -8974,6 +8974,20 @@ function rwSave() {
   const all = rwAll(); all[LIB.current] = { date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '', time: t, at: Date.now() };
   const ids = Object.keys(all).sort((a, b) => all[b].at - all[a].at); for (const k of ids.slice(200)) delete all[k]; // 200 traces au plus
   try { localStorage.setItem(RW_KEY, JSON.stringify(all)); } catch (e) {}
+  rwSync(LIB.current, all[LIB.current]);
+}
+// Page Sortie : la sortie programmée part aussi dans le compte (ride_plans) → la veille à 19 h, « Météo sur ta trace … »
+// (Sillage.cc +) ou une invitation (compte gratuit). Fonction ride-plans. Parcours du compte seulement.
+async function rwSync(id, w) {
+  if (S.mode !== 'ride' || GUEST || !w || !w.date || w.date < ymd(new Date()) || !hasSbToken()) return;
+  const m = LIB.list.find(x => x.id === id); if (!m || !m.remote) return;
+  try {
+    const sb = await sbIfLogged(); if (!sb || !SB_UID) return;
+    const o = readOpt();
+    await sb.from('ride_plans').upsert({ user_id: SB_UID, route_id: id, date: w.date, time: w.time, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Paris',
+      lang: LANG, dist: UNITS.mi ? 'mi' : 'km', temp: UNITS.f ? 'f' : 'c', page: location.origin + location.pathname,
+      speed: +o.speed || null, vam: +o.vam || null, notified_at: null, updated_at: new Date().toISOString() }, { onConflict: 'user_id,route_id' });
+  } catch (e) {}
 }
 function rwApply(id) { // avant le calcul : remet la date et l'heure gardées pour cette trace
   if (S.mode === 'taf' || window.PMR_ALERT_LINK) return false;
