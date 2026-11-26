@@ -974,6 +974,22 @@ body:not(.admin) .me-adm{display:none}
 .me-lv{font-size:15px;color:var(--muted);text-align:right}
 .me-chev{width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;transition:transform .15s}
 details[open]>summary .me-chev{transform:rotate(90deg)}
+.me-ntf .me-row2{gap:14px}.me-ntf-ic{width:36px;height:36px;border-radius:999px;background:var(--brand);color:var(--brand-ink);display:flex;align-items:center;justify-content:center;flex:none}.me-ntf-ic svg{width:20px;height:20px}
+.ntf-back{border:0;background:none;color:var(--ink);width:40px;height:40px;margin:0 2px 0 -8px;padding:0;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;cursor:pointer;border-radius:999px}.ntf-back svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ntf-intro{margin:14px 4px 0}
+.ntf-row{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:64px;box-sizing:border-box;cursor:pointer}.ntf-row+.ntf-row{border-top:1px solid var(--line)}
+.ntf-when{font-style:normal;font-family:var(--f-mono);font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.ntf-sw{appearance:none;-webkit-appearance:none;flex:none;width:52px;height:32px;border-radius:999px;background:var(--line);position:relative;margin:0;cursor:pointer;transition:background .15s}
+.ntf-sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:999px;background:var(--muted);transition:transform .15s,background .15s}
+.ntf-sw:checked{background:var(--brand)}.ntf-sw:checked::after{transform:translateX(20px);background:var(--brand-ink)}
+.ntf-sw:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+body.free .ntf-p{display:none}body.free .ntf-row:has(.ntf-p){cursor:default}body.free .ntf-row:has(.ntf-p) .me-lt b{color:var(--muted)}
+.ntf-lock{flex:none;border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-family:var(--f-mono);font-size:12px;color:var(--ink)}
+.ntf-taf{margin:0;padding:0 16px 12px}
+.ntf-next{padding:0 16px}.ntf-next .me-next{margin:0 0 12px}
+.ntf-al #alBox{padding:0 16px}.ntf-al .me-more{margin-top:0}
+.ntf-plus{margin-top:12px}
+#alOff{display:none!important}
 .me-gl{font-family:var(--f-mono);font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:24px auto 8px;padding-left:4px}
 .me-list{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 .me-list>*+*{border-top:1px solid color-mix(in srgb,var(--line) 60%,var(--panel))}
@@ -2009,30 +2025,10 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     <span class="al-l me-ret">Retour · travail → maison</span>
     <div class="seg2 me-theme me-ret" id="meTafKind" role="group" aria-label="Trace du retour"><button type="button" data-k="rev" aria-pressed="true">À l'envers</button><button type="button" data-k="other" aria-pressed="false">Une autre trace</button></div>
     <select id="meTafRet" class="me-sel me-ret" aria-label="Trajet Commute : trace du retour" hidden></select>
-    <label class="arrows-toggle me-ret"><input type="checkbox" id="meTafAl" checked> Météo du trajet en notification</label>
-    <p class="hint me-ret" id="meTafAlTxt">La veille à 20 h 30 pour l'aller, 2 h avant le départ du retour, du lundi au vendredi. Les notifications doivent être activées sur ce téléphone (Alertes météo, plus bas).</p></div>
-  <div class="me-card" id="alCard"><h3>Alertes météo</h3>
-    <p class="hint">La météo de ton parcours à ton heure de départ, la veille au soir ou le matin même.</p><div class="me-next" id="alNext" hidden><span>Prochaine alerte</span><b id="alNextTxt"></b></div>
-    <div class="guest-lock guest-only"><b>Avec un compte gratuit</b><p>Choisis un parcours enregistré et reçois sa météo la veille au soir ou le matin même.</p><button type="button" class="btn small primary" data-guest-up>Créer mon compte gratuit</button></div>
-    <div class="guest-lock free-only"><b>Avec Sillage.cc +</b><p>Choisis un parcours enregistré et reçois sa météo la veille au soir ou le matin même. En attendant, active les notifications pour recevoir les nouvelles de Sillage.</p><button type="button" class="btn small primary" data-plus>Découvrir Sillage.cc +</button></div>
-    <p class="al-why no-guest" id="alWhy" hidden></p>
-    <div id="alBox" class="no-guest">
-      <div class="me-btns al-dev"><button type="button" class="btn small primary" id="alOn">Activer sur cet appareil</button><span class="al-state" id="alState"></span></div>
-      <details class="me-more no-lim" id="alMore"><summary><span class="me-lt"><b>Régler les alertes</b><span>Parcours, heure, la veille ou le matin, jours</span></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
-      <span class="al-l">Dossier</span>
-      <div class="me-mseg al-kind" id="alKind" role="group" aria-label="Dossier des parcours"></div>
-      <label class="al-l" for="alRoute">Parcours</label>
-      <select id="alRoute" class="me-sel"></select>
-      <div class="al-grid">
-        <div><label class="al-l" for="alTime">Départ</label><input type="time" id="alTime" step="900" class="me-sel"></div>
-        <div><label class="al-l" for="alWhen">Prévenir</label><select id="alWhen" class="me-sel"><option value="eve">La veille, 20 h</option><option value="morn">Le matin, 7 h</option></select></div>
-      </div>
-      <span class="al-l">Jours de sortie</span>
-      <div class="al-days" id="alDays" role="group" aria-label="Jours de sortie"></div><div class="al-legend"><span class="on">✓ Alerte activée</span><span class="no">✕ Pas d'alerte</span></div>
-      <div class="me-btns"><button type="button" class="btn small" id="alTest">Envoyer l'alerte maintenant</button><button type="button" class="btn small" id="alOff">Couper les alertes</button></div>
-      </details>
-      <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
-    </div></div>
+    <p class="hint me-ret">Sa météo en notification : Moi → Notifications.</p></div>
+  <div class="me-card guest-only"><h3>Notifications</h3>
+    <div class="guest-lock"><b>Avec un compte gratuit</b><p>Choisis un parcours enregistré et reçois sa météo la veille au soir ou le matin même.</p><button type="button" class="btn small primary" data-guest-up>Créer mon compte gratuit</button></div></div>
+  <div class="me-list no-guest me-ntf"><button type="button" class="me-row2" id="meNtf"><span class="me-ntf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></span><span class="me-lt"><b>Notifications</b><span id="meNtfSub"></span></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
   <div class="me-card no-guest app-only" id="meOcCard"><h3>Cartes de mes traces, hors ligne</h3>
     <p class="hint">Le fond de carte, le relief et les points utiles à 15 km de chaque trace gardée, de plus en plus détaillés près du tracé. Tu les gardes depuis la carte d'une sortie ou depuis Mes parcours.</p>
     <p class="hint" id="meOcSum"></p>
@@ -2064,6 +2060,51 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
   </div>
   <p class="me-del2 no-guest"><button type="button" class="linkbtn" id="meDel">Supprimer mon compte</button></p>
   <p class="me-ver" id="meVer" hidden></p>
+</section>
+<section class="libpage me2" id="ntfPage" hidden aria-labelledby="ntfTitle">
+  <div class="lp-head"><h2 id="ntfTitle"><button type="button" class="ntf-back" id="ntfBack" aria-label="Retour à Moi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>Notifications</h2><button type="button" class="btn small pg-x">Fermer</button></div>
+  <div class="me-card" id="alCard">
+    <p class="al-why" id="alWhy" hidden></p>
+    <div class="me-btns al-dev"><button type="button" class="btn small primary" id="alOn">Activer sur cet appareil</button><span class="al-state" id="alState"></span></div>
+    <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
+  </div>
+  <div class="guest-lock free-only ntf-plus"><b>Choisis ta météo, avec Sillage.cc +</b><p>La veille de ta sortie, avant ton trajet, ou sur le parcours que tu surveilles : la météo arrive toute seule sur ton téléphone.</p><button type="button" class="btn small primary" data-plus>Découvrir Sillage.cc +</button></div>
+  <p class="hint ntf-intro">Choisis ce que Sillage t'envoie. Tes choix valent pour ton compte, sur tous tes appareils.</p>
+  <p class="me-gl">Mes sorties</p>
+  <div class="me-list">
+    <label class="ntf-row"><span class="me-lt"><b>Ma sortie programmée</b><span>La météo de la trace dont tu as réglé le jour et l'heure.</span><i class="ntf-when">La veille · 19 h</i></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="ride" role="switch"></label>
+  </div>
+  <p class="me-gl">Commute</p>
+  <div class="me-list">
+    <label class="ntf-row"><span class="me-lt"><b>La veille au soir</b><span>La météo de l'aller, pour préparer tes affaires.</span><i class="ntf-when">Veille · 20 h 30</i></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="taf_eve" role="switch"></label>
+    <label class="ntf-row"><span class="me-lt"><b>Avant de partir</b><span>La météo de l'aller, remise à jour.</span><i class="ntf-when">45 min avant le départ</i></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="taf_morn" role="switch"></label>
+    <label class="ntf-row"><span class="me-lt"><b>Avant le retour</b><span>La météo du retour, avant de quitter le travail.</span><i class="ntf-when">2 h avant le retour</i></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="taf_aft" role="switch"></label>
+    <p class="hint ntf-taf" id="ntfTaf"></p>
+  </div>
+  <p class="me-gl">Alerte d'un parcours</p>
+  <div class="me-list ntf-al">
+    <label class="ntf-row"><span class="me-lt"><b>Un parcours à surveiller</b><span id="ntfAlSub"></span></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="alert" role="switch"></label>
+    <div class="ntf-next"><div class="me-next" id="alNext" hidden><span>Prochaine alerte</span><b id="alNextTxt"></b></div></div>
+    <div id="alBox" class="no-guest">
+      <details class="me-more no-lim" id="alMore"><summary><span class="me-lt"><b>Régler les alertes</b><span>Parcours, heure, la veille ou le matin, jours</span></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <span class="al-l">Dossier</span>
+      <div class="me-mseg al-kind" id="alKind" role="group" aria-label="Dossier des parcours"></div>
+      <label class="al-l" for="alRoute">Parcours</label>
+      <select id="alRoute" class="me-sel"></select>
+      <div class="al-grid">
+        <div><label class="al-l" for="alTime">Départ</label><input type="time" id="alTime" step="900" class="me-sel"></div>
+        <div><label class="al-l" for="alWhen">Prévenir</label><select id="alWhen" class="me-sel"><option value="eve">La veille, 20 h</option><option value="morn">Le matin, 7 h</option></select></div>
+      </div>
+      <span class="al-l">Jours de sortie</span>
+      <div class="al-days" id="alDays" role="group" aria-label="Jours de sortie"></div><div class="al-legend"><span class="on">✓ Alerte activée</span><span class="no">✕ Pas d'alerte</span></div>
+      <div class="me-btns"><button type="button" class="btn small" id="alTest">Envoyer l'alerte maintenant</button><button type="button" class="btn small" id="alOff">Couper les alertes</button></div>
+      </details>
+    </div>
+  </div>
+  <p class="me-gl">Sillage</p>
+  <div class="me-list">
+    <label class="ntf-row"><span class="me-lt"><b>Nouveautés et conseils</b><span>Les nouveautés de l'app et les messages de l'équipe.</span><i class="ntf-when">Quand il y a du nouveau</i></span><input type="checkbox" class="ntf-sw" data-k="news" role="switch"></label>
+  </div>
 </section>
 <section class="libpage help2" id="helpPage" hidden aria-labelledby="hpTitle">
   <div class="lp-head"><h2 id="hpTitle">Aide</h2><button type="button" class="btn small pg-x">Fermer</button></div>
@@ -9087,7 +9128,7 @@ async function lpRename(id, name) {
 }
 $('#lpAll').addEventListener('click', lpOpen);
 // Pages plein écran (Mes parcours, Mes sorties, Moi) : une seule ouverte à la fois, onglet du bas allumé.
-const PAGES = ['libPage', 'outPage', 'mePage', 'mapPage', 'helpPage'];
+const PAGES = ['libPage', 'outPage', 'mePage', 'mapPage', 'helpPage', 'ntfPage'];
 function pageOpen(pid, tabSel) {
   sheetClose();
   for (const q of PAGES) { const el = document.getElementById(q); if (el) el.hidden = q !== pid; }
@@ -9528,7 +9569,7 @@ function meRender() {
   $('#meVMotion').textContent = seg('meMotion'); $('#meVFont').textContent = seg('meFont').replace(/\s*\(.*\)/, '');
   meTafSel();
 }
-function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); $('#meTafAl').checked = tafAlOn(); tafSync(); }
+function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); ntfLoad(); tafSync(); }
 const ME_STEP = { speed: [12, 40, 0.5], vam: [0, 1400, 50], pmin: [0, 30, 1] };
 function meModesRender() {
   const m = ME.mode, g = meGet(m), fmt = { speed: v => fV(+v, 1) + ' ' + UL.kmh, vam: v => +v > 0 ? fE(+v) + ' ' + UL.mh : T("désactivée"), pmin: v => v + ' min' };
@@ -9650,7 +9691,52 @@ async function tafSyncNow() {
   } catch (e) {}
 }
 setTimeout(() => { if (!GUEST) tafSync(); }, 10000); // à l'ouverture de l'app : le compte suit les réglages de ce téléphone
-$('#meTafAl').addEventListener('change', e => { try { localStorage.setItem('pmr-taf-al', e.target.checked ? '1' : '0'); } catch (err) {} tafSync(); });
+/* ---------- menu Notifications (27/11/2026, maquette « Sillage · Menu Notifications ») ----------
+   Moi → Notifications (#ntfPage) : l'appareil (#alCard : activer, état), puis ce que le compte veut recevoir, gardé dans
+   notif_prefs (pas de ligne = tout activé) : ride (sortie programmée, ride-plans), taf_eve / taf_morn / taf_aft (commute-alerts),
+   news (messages « tout le monde » de la supervision). L'alerte d'un parcours reste push_alerts.enabled (alSave).
+   Compte gratuit : seules les nouveautés se règlent ; le reste porte « Sillage.cc + ». */
+var NTF = { p: { ride: true, taf_eve: true, taf_morn: true, taf_aft: true, news: true }, uid: '' };
+function NTF_N() { return ['ride', 'taf_eve', 'taf_morn', 'taf_aft', 'news'].filter(k => NTF.p[k]).length + (AL.row && AL.row.enabled ? 1 : 0); }
+function ntfRender() {
+  if (!NTF || !$('#ntfPage')) return;
+  const dev = !!($('#alState') && $('#alState').textContent), alOn = !!(AL.row && AL.row.enabled), r = AL.row || {};
+  for (const i of document.querySelectorAll('#ntfPage .ntf-sw[data-k]')) {
+    const k = i.dataset.k; i.checked = k === 'alert' ? alOn : !!NTF.p[k];
+    i.disabled = !!(LIM && k !== 'news'); i.setAttribute('aria-checked', String(i.checked));
+  }
+  let tafName = ''; try { const id = localStorage.getItem('pmr-taf-route') || ''; const x = LIB.list.find(y => y.id === id); tafName = x ? x.name : ''; } catch (e) {}
+  if ($('#ntfTaf')) $('#ntfTaf').textContent = FREE ? T("Pendant l'essai Commute de 5 jours, la météo de ton trajet arrive quand même.")
+    : tafName ? T("Ton trajet : {0}", [tafName]) : T("Choisis ton trajet dans Moi → Mon trajet Commute.");
+  if ($('#ntfAlSub')) $('#ntfAlSub').textContent = FREE ? T("La veille ou le matin même, les jours choisis.")
+    : r.route_name ? T("{0} · départ {1} · {2}", [r.route_name, r.dep_time || '09:00', r.notify === 'morn' ? T("le matin à 7 h") : T("la veille à 20 h")]) : T("Choisis un parcours dans « Régler les alertes ».");
+  if ($('#meNtfSub')) $('#meNtfSub').textContent = (FREE ? (NTF.p.news ? T("Nouvelles de Sillage") : T("Aucune")) : T("{0} sur 6 actives", [NTF_N()]))
+    + ' · ' + (dev ? T("ce téléphone ✓") : T("à activer sur cet appareil"));
+}
+async function ntfLoad() {
+  ntfRender();
+  try { const sb = await sbIfLogged(); if (!sb || GUEST) return;
+    const { data } = await sb.from('notif_prefs').select('ride,taf_eve,taf_morn,taf_aft,news').eq('user_id', SB_UID).maybeSingle();
+    if (data) Object.assign(NTF.p, data); NTF.uid = SB_UID; ntfRender(); } catch (e) {}
+}
+async function ntfSave(k, v) {
+  NTF.p[k] = v; ntfRender();
+  if (k.startsWith('taf_')) { try { localStorage.setItem('pmr-taf-al', NTF.p.taf_eve || NTF.p.taf_morn || NTF.p.taf_aft ? '1' : '0'); } catch (e) {} tafSync(); }
+  try { const sb = await sbIfLogged(); if (!sb) return;
+    const { error } = await sb.from('notif_prefs').upsert({ user_id: SB_UID, ...NTF.p, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) alMsg(T("Réglages non enregistrés : {0}", [error.message])); } catch (e) {}
+}
+function ntfOpen() { pageOpen('ntfPage', '#tabMe'); alRender(); alLoad(); ntfLoad(); }
+$('#meNtf').addEventListener('click', ntfOpen);
+$('#ntfBack').addEventListener('click', meOpen);
+$('#ntfPage').addEventListener('change', async e => {
+  const i = e.target.closest && e.target.closest('.ntf-sw[data-k]'); if (!i) return;
+  const k = i.dataset.k, v = i.checked;
+  if (k !== 'alert') { ntfSave(k, v); return; }
+  alMsg('');
+  if (await alSave({ enabled: v })) alMsg(v ? T("Alerte activée : choisis le parcours, l'heure et les jours dans « Régler les alertes ».") : T("Alerte coupée. Tes réglages sont gardés."));
+  alRender(); ntfRender();
+});
 $('#meTaf').addEventListener('change', () => { ME.tafOther = false; meTafSave(); });
 $('#meTafRet').addEventListener('change', meTafSave);
 $('#meTafKind').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (!b) return; ME.tafOther = b.dataset.k === 'other'; meTafSave(); if (ME.tafOther) $('#meTafRet').focus(); });
@@ -9810,6 +9896,7 @@ function alRender() {
     const when = dd === 0 ? T("Aujourd'hui") : dd === 1 ? T("Demain") : dayFmt.format(nx);
     $('#alNextTxt').textContent = T("{0} {1} h · {2}, départ {3}", [when, nx.getHours(), r.route_name || ($('#alRoute').selectedOptions[0] || {}).text || T("Parcours"), r.dep_time || '09:00']); }
   if ($('#meKAl')) { $('#meKAl').textContent = on ? 'ON' : 'OFF'; $('#meKAl').classList.toggle('on', on); }
+  if (typeof ntfRender === 'function') ntfRender();
 }
 async function alSave(patch) {
   const sb = await sbIfLogged(); if (!sb) { alMsg(T("Connecte-toi pour régler les alertes.")); return false; }

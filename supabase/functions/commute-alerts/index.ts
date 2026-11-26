@@ -160,6 +160,9 @@ Deno.serve(async (req: Request) => {
       await db.from('commute_alerts').update(slot === 'eve' ? { last_eve: L.date } : slot === 'morn' ? { last_morn: L.date } : { last_aft: L.date }).eq('user_id', r.user_id);
       const { data: u } = await db.from('app_users').select('status,pmr,plan,plus_until,is_admin').eq('user_id', r.user_id).maybeSingle();
       if (!u || u.status !== 'active' || !u.pmr) continue;
+      // menu Notifications (27/11/2026) : chaque créneau peut être coupé (pas de ligne = tout activé)
+      const { data: np } = await db.from('notif_prefs').select('taf_eve,taf_morn,taf_aft').eq('user_id', r.user_id).maybeSingle();
+      if (np && (np as Record<string, boolean>)['taf_' + slot] === false) { out.push({ u: r.user_id, slot, off: true }); continue; }
       const msg = await build(db, r, plusOf(u), slot, L.date); if (!msg) { out.push({ u: r.user_id, slot, skip: true }); continue; }
       out.push({ u: r.user_id, slot, ...(await deliver(db, keys, r.user_id, msg)) });
     } catch (e) { out.push({ u: r.user_id, error: String((e as Error).message ?? e).slice(0, 200) }); }

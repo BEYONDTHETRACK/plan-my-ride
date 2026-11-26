@@ -85,6 +85,8 @@ Deno.serve(async (req: Request) => {
       await db.from('ride_plans').update({ notified_at: new Date().toISOString() }).eq('user_id', p.user_id).eq('route_id', p.route_id);
       const { data: u } = await db.from('app_users').select('status,pmr,plan,plus_until,is_admin').eq('user_id', p.user_id).maybeSingle();
       if (!u || u.status !== 'active' || !u.pmr) continue;
+      const { data: np } = await db.from('notif_prefs').select('ride').eq('user_id', p.user_id).maybeSingle(); // menu Notifications (27/11/2026)
+      if (np && np.ride === false) continue;
       const msg = await build(db, p, plusOf(u), L.date); if (!msg) continue;
       out.push({ u: p.user_id, r: p.route_id, ...(await deliver(db, keys, p.user_id, msg)) });
     } catch (e) { out.push({ u: p.user_id, error: String((e as Error).message ?? e).slice(0, 200) }); }

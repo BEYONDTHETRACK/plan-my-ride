@@ -95,9 +95,13 @@ async function deliver(db: Admin, keys: VapidKeys, userId: string, msg: Record<s
 async function broadcast(db: Admin, keys: VapidKeys, users: string[] | null, pf: string[], msg: Record<string, unknown>) {
   let devices = 0, sent = 0;
   const ids = (q: any) => users ? q.in('user_id', users) : q;
+  // « Tout le monde » (27/11/2026) : pas les comptes qui ont coupé « Nouveautés et conseils » (notif_prefs.news)
+  const muted = new Set<string>();
+  if (!users) { const { data: np } = await db.from('notif_prefs').select('user_id').eq('news', false); for (const x of np ?? []) muted.add(x.user_id as string); }
   if (pf.includes('web')) {
-    const { data: subs } = await ids(db.from('push_subs').select('id,endpoint,p256dh,auth'));
+    const { data: subs } = await ids(db.from('push_subs').select('id,user_id,endpoint,p256dh,auth'));
     for (const s of subs ?? []) {
+      if (muted.has(s.user_id)) continue;
       devices++; let st = 0;
       try { st = await sendPush(s as Sub, msg, keys, SUBJECT); } catch (_) { st = 0; }
       if (st >= 200 && st < 300) sent++;
@@ -106,8 +110,9 @@ async function broadcast(db: Admin, keys: VapidKeys, users: string[] | null, pf:
   }
   const nat = pf.filter(p => p === 'ios' || p === 'android');
   if (nat.length) {
-    const { data: devs } = await ids(db.from('push_devices').select('id,token').in('platform', nat));
+    const { data: devs } = await ids(db.from('push_devices').select('id,user_id,token').in('platform', nat));
     for (const d of devs ?? []) {
+      if (muted.has(d.user_id)) continue;
       devices++; let st = 0;
       try { st = await sendFcm(d.token as string, msg); } catch (_) { st = 0; }
       if (st >= 200 && st < 300) sent++;
