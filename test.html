@@ -2677,6 +2677,7 @@ function hashMode(hs) { return hs === '#ultra' ? 'ultra' : hs === '#velotaf' ? '
   localStorage.setItem('pmr-last-route', r);
   const d = q.get('date') || '', t = q.get('time') || '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) sessionStorage.setItem('pmr-ride-date', d);
+  window.PMR_ALERT_LINK = true;
   if (/^\d{2}:\d{2}$/.test(t)) sessionStorage.setItem('pmr-ride-time', t);
   for (const k of ['route', 'date', 'time']) q.delete(k);
   history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
@@ -8885,7 +8886,9 @@ async function libOpen(id) {
   }
   if (!rec) { setStatus(T("Ce parcours n'est plus disponible."), 'err'); return; }
   LIB.current = id; try { if (S.mode !== 'taf') localStorage.setItem('pmr-last-route', id); } catch (e) {} // les trajets Commute ne remplacent pas le dernier parcours des autres pages
+  rwApply(id);
   try { loadRoute(unpackPts(rec.pts), m.name, revGet(id)); } catch (e) { setStatus(e.message, 'err'); return; }
+  window.PMR_ALERT_LINK = false;
   const now = new Date().toISOString(); libUpsert({ id, used_at: now }); libRender();
   try { await idbRun('meta', 'readwrite', st => st.put({ id, name: m.name, km: m.km, dplus: m.dplus, used_at: now, kind: m.kind || null })); } catch (e) {}
   const sb = await sbIfLogged(); if (sb && m.remote) sb.from('routes').update({ used_at: now }).eq('user_id', SB_UID).eq('id', id).then(() => {});
@@ -8960,7 +8963,27 @@ function sheetOpen(sel) {
 }
 $('#settings').addEventListener('scroll', e => { if (e.currentTarget.scrollLeft) e.currentTarget.scrollLeft = 0; }, { passive: true });
 function sheetClose() { document.body.classList.remove('sheet-open'); }
-$('#sheetOk').addEventListener('click', sheetClose);
+/* Jour et heure gardés avec chaque trace (26/11/2026, demande d'Antoine) : « OK » des réglages enregistre la date et l'heure
+   de départ de la trace ouverte (pmr-route-when, sur ce téléphone ou ce navigateur) ; en rouvrant la trace, on retrouve
+   la même heure, et le même jour s'il n'est pas passé (sinon aujourd'hui). Pages Sortie et Ultra ; Commute a ses propres heures. */
+const RW_KEY = 'pmr-route-when';
+const rwAll = () => { try { return JSON.parse(localStorage.getItem(RW_KEY) || '{}') || {}; } catch (e) { return {}; } };
+function rwSave() {
+  if (!LIB.current || S.mode === 'taf') return;
+  const d = $('#date').value, t = $('#time').value; if (!/^\d{2}:\d{2}$/.test(t)) return;
+  const all = rwAll(); all[LIB.current] = { date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '', time: t, at: Date.now() };
+  const ids = Object.keys(all).sort((a, b) => all[b].at - all[a].at); for (const k of ids.slice(200)) delete all[k]; // 200 traces au plus
+  try { localStorage.setItem(RW_KEY, JSON.stringify(all)); } catch (e) {}
+}
+function rwApply(id) { // avant le calcul : remet la date et l'heure gardées pour cette trace
+  if (S.mode === 'taf' || window.PMR_ALERT_LINK) return false;
+  const w = rwAll()[id]; if (!w || !/^\d{2}:\d{2}$/.test(w.time)) return false;
+  const today = ymd(new Date());
+  $('#date').value = w.date && w.date >= today ? w.date : today; $('#time').value = w.time;
+  return true;
+}
+$('#sheetOk').addEventListener('click', () => { rwSave(); sheetClose(); });
+for (const k of ['#date', '#time']) $(k).addEventListener('change', rwSave); // grand écran : pas de bouton OK, chaque changement compte
 $('#sheetBg').addEventListener('click', sheetClose);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('sheet-open')) sheetClose(); });
 $('#tabLib').addEventListener('click', lpOpen);
