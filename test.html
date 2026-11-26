@@ -2006,7 +2006,9 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     <label class="al-l" for="meTaf">Aller · maison → travail</label><select id="meTaf" class="me-sel" aria-label="Trajet Commute : aller"></select>
     <span class="al-l me-ret">Retour · travail → maison</span>
     <div class="seg2 me-theme me-ret" id="meTafKind" role="group" aria-label="Trace du retour"><button type="button" data-k="rev" aria-pressed="true">À l'envers</button><button type="button" data-k="other" aria-pressed="false">Une autre trace</button></div>
-    <select id="meTafRet" class="me-sel me-ret" aria-label="Trajet Commute : trace du retour" hidden></select></div>
+    <select id="meTafRet" class="me-sel me-ret" aria-label="Trajet Commute : trace du retour" hidden></select>
+    <label class="arrows-toggle me-ret"><input type="checkbox" id="meTafAl" checked> Météo du trajet en notification</label>
+    <p class="hint me-ret" id="meTafAlTxt">La veille à 20 h 30 pour l'aller, 2 h avant le départ du retour, du lundi au vendredi. Les notifications doivent être activées sur ce téléphone (Alertes météo, plus bas).</p></div>
   <div class="me-card" id="alCard"><h3>Alertes météo</h3>
     <p class="hint">La météo de ton parcours à ton heure de départ, la veille au soir ou le matin même.</p><div class="me-next" id="alNext" hidden><span>Prochaine alerte</span><b id="alNextTxt"></b></div>
     <div class="guest-lock guest-only"><b>Avec un compte gratuit</b><p>Choisis un parcours enregistré et reçois sa météo la veille au soir ou le matin même.</p><button type="button" class="btn small primary" data-guest-up>Créer mon compte gratuit</button></div>
@@ -2659,6 +2661,13 @@ if (UNITS.mi) {
 /* ---------- état ---------- */
 // pages : Sortie (#), Ultra (#ultra), Vélotaf (#velotaf)
 function hashMode(hs) { return hs === '#ultra' ? 'ultra' : hs === '#velotaf' ? 'taf' : 'ride'; }
+// Liens des notifications Commute (26/11/2026) : ?open=taf ouvre la page Commute, ?open=plus l'offre Sillage.cc +.
+(() => { try {
+  const q = new URLSearchParams(location.search), o = q.get('open'); if (!o) return;
+  q.delete('open');
+  if (o === 'plus') sessionStorage.setItem('pmr-open-plus', '1');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + (o === 'taf' ? '#velotaf' : location.hash));
+} catch (e) {} })();
 // Lien d'une alerte météo (?route=ID&date=AAAA-MM-JJ&time=HH:MM) : ce parcours en page Sortie, à ce jour et cette heure.
 (() => { try {
   const q = new URLSearchParams(location.search), r = q.get('route'); if (!r) return;
@@ -6121,7 +6130,7 @@ const MODE_DEF = {
   taf: { time: '07:45', speed: 20, vam: 0, pause: 0, pauseMode: 'pct', pauseMin: 0, pauseEvery: 1, windOn: false, poiRadius: 500, tafBack: '17:30', tafRet: '' },
   ultra: { time: '07:00', speed: 22, vam: 0, pause: 0, pauseMode: 'min', pauseMin: 0, pauseEvery: 1, windOn: false, poiRadius: 500, planDays: 3, planSplit: 'km', planCustom: false, planTimes: [], planEnds: [] }
 };
-function saveOpt(o) { try { localStorage.setItem(optKey(), JSON.stringify({ ...o, date: S.mode === 'ultra' ? o.date : undefined })); } catch (e) {} }
+function saveOpt(o) { try { localStorage.setItem(optKey(), JSON.stringify({ ...o, date: S.mode === 'ultra' ? o.date : undefined })); } catch (e) {} if (S.mode === 'taf' && typeof tafSync === 'function') tafSync(); }
 function initInputs() {
   const tm = new Date(); tm.setDate(tm.getDate() + 1);
   let saved = {}; try { saved = JSON.parse(localStorage.getItem(optKey()) || '{}') || {}; } catch (e) {}
@@ -7621,7 +7630,7 @@ $('#tafTrips').addEventListener('click', async e => {
 $('#tafTrips').addEventListener('change', e => {
   if (e.target.id !== 'ttDef') return; const on = e.target.checked;
   try { if (on && LIB.current) { localStorage.setItem('pmr-taf-route', LIB.current); if (TAF.ret) localStorage.setItem('pmr-taf-ret', TAF.ret); else localStorage.removeItem('pmr-taf-ret'); } else { localStorage.removeItem('pmr-taf-route'); localStorage.removeItem('pmr-taf-ret'); } } catch (err) {}
-  meTafSel(); tripsRender();
+  meTafSel(); tripsRender(); tafSync();
 });
 $('#ttList').addEventListener('click', async e => {
   const b = e.target.closest('[data-pick]'); if (!b) return; const id = b.dataset.pick; $('#ttDlg').close();
@@ -8620,6 +8629,7 @@ document.addEventListener('click', e => {
 $('#guestOk').addEventListener('click', () => $('#guestDlg').close());
 $('#guestX').addEventListener('click', () => $('#guestDlg').close());
 $('#plusOk').addEventListener('click', () => $('#plusDlg').close());
+try { if (sessionStorage.getItem('pmr-open-plus')) { sessionStorage.removeItem('pmr-open-plus'); if (FREE) setTimeout(() => plusDlg(), 1200); } } catch (e) {}
 $('#plusX').addEventListener('click', () => $('#plusDlg').close());
 $('#meGuestRules').addEventListener('click', () => guestDlg(''));
 $('#meGuestEnd').addEventListener('click', () => guestEnd(false));
@@ -9386,7 +9396,7 @@ function meRender() {
   $('#meVMotion').textContent = seg('meMotion'); $('#meVFont').textContent = seg('meFont').replace(/\s*\(.*\)/, '');
   meTafSel();
 }
-function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); }
+function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); $('#meTafAl').checked = tafAlOn(); tafSync(); }
 const ME_STEP = { speed: [12, 40, 0.5], vam: [0, 1400, 50], pmin: [0, 30, 1] };
 function meModesRender() {
   const m = ME.mode, g = meGet(m), fmt = { speed: v => fV(+v, 1) + ' ' + UL.kmh, vam: v => +v > 0 ? fE(+v) + ' ' + UL.mh : T("désactivée"), pmin: v => v + ' min' };
@@ -9483,9 +9493,32 @@ function meTafSel() {
 function meTafSave() {
   const go = $('#meTaf').value, ret = go && ME.tafOther ? $('#meTafRet').value : '';
   try { if (go) localStorage.setItem('pmr-taf-route', go); else localStorage.removeItem('pmr-taf-route'); if (go && ret && ret !== go) localStorage.setItem('pmr-taf-ret', ret); else localStorage.removeItem('pmr-taf-ret'); } catch (e) {}
-  meTafSel();
+  meTafSel(); tafSync();
   if (S.mode === 'taf') { if (go) tafOpenDefault(); else tripsRender(); }
 }
+/* Alertes Commute (26/11/2026) : le trajet fixé ici, les heures et réglages de la page Commute (pmr-opt-taf) sont recopiés
+   dans le compte (table commute_alerts) ; la fonction commute-alerts envoie la météo la veille à 20 h 30 (aller)
+   et 2 h avant le retour. Case « Météo du trajet en notification » : pmr-taf-al ('0' = coupé). Démo : rien. */
+const tafAlOn = () => { try { return localStorage.getItem('pmr-taf-al') !== '0'; } catch (e) { return true; } };
+let tafSyncT = 0;
+function tafSync() { clearTimeout(tafSyncT); tafSyncT = setTimeout(tafSyncNow, 1500); }
+async function tafSyncNow() {
+  if (GUEST || !hasSbToken()) return;
+  try {
+    const sb = await sbIfLogged(); if (!sb || !SB_UID) return;
+    const fx = tafFixed(), go = fx && LIB.list.find(x => x.id === fx.go && x.remote), ret = fx && fx.ret && LIB.list.find(x => x.id === fx.ret && x.remote);
+    if (!go) { await sb.from('commute_alerts').update({ enabled: false, updated_at: new Date().toISOString() }).eq('user_id', SB_UID); return; }
+    let o = {}; try { o = JSON.parse(localStorage.getItem('pmr-opt-taf') || '{}') || {}; } catch (e) {}
+    o = { ...MODE_DEF.taf, ...o };
+    const row = { user_id: SB_UID, enabled: tafAlOn(), route_go: go.id, route_ret: ret ? ret.id : null, go_time: o.time || '07:45', go_mode: o.tafGoMode === 'arr' ? 'arr' : 'dep',
+      margin: Math.round(+o.tafMargin || 0), back_time: o.tafBack || '17:30', per_day: !!o.tafPerDay, days: o.tafDays && typeof o.tafDays === 'object' ? o.tafDays : null,
+      speed: +o.speed || null, vam: +o.vam || null, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Paris', lang: LANG,
+      dist: UNITS.mi ? 'mi' : 'km', temp: UNITS.f ? 'f' : 'c', page: location.origin + location.pathname, updated_at: new Date().toISOString() };
+    await sb.from('commute_alerts').upsert(row, { onConflict: 'user_id' });
+  } catch (e) {}
+}
+setTimeout(() => { if (!GUEST) tafSync(); }, 10000); // à l'ouverture de l'app : le compte suit les réglages de ce téléphone
+$('#meTafAl').addEventListener('change', e => { try { localStorage.setItem('pmr-taf-al', e.target.checked ? '1' : '0'); } catch (err) {} tafSync(); });
 $('#meTaf').addEventListener('change', () => { ME.tafOther = false; meTafSave(); });
 $('#meTafRet').addEventListener('change', meTafSave);
 $('#meTafKind').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (!b) return; ME.tafOther = b.dataset.k === 'other'; meTafSave(); if (ME.tafOther) $('#meTafRet').focus(); });
