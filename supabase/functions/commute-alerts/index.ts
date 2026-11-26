@@ -20,7 +20,7 @@ type Row = { user_id: string; enabled: boolean; route_go: string; route_ret: str
   tz: string | null; lang: string | null; dist: string | null; temp: string | null; page: string | null; started_at: string; last_eve: string | null; last_aft: string | null };
 
 const EN: Record<string, string> = {
-  'Demain {0} · Commute aller': 'Tomorrow {0} · Commute out', 'Retour {0} · Commute': 'Ride home {0} · Commute',
+  'Demain {0} - {1}': 'Tomorrow {0} - {1}', 'Retour {0} - {1}': 'Ride home {0} - {1}',
   'Ton trajet de demain': "Tomorrow's commute", 'Ton trajet retour': 'Your ride home',
   'Avec Sillage.cc +, tu recevrais ici la météo de ton trajet aller, la veille au soir, et celle du retour deux heures avant de rentrer.':
     'With Sillage.cc +, you would get the weather for your ride to work here the evening before, and for your ride home two hours before you leave.',
@@ -49,17 +49,17 @@ function freePhase(n: number, slot: 'eve' | 'aft'): 'wx' | 'inv' | null {
   return (Math.floor((n - 16) / 5) % 2 === 0 ? 'eve' : 'aft') === slot ? 'inv' : null;
 }
 
-async function pts(db: Admin, uid: string, id: string) {
-  const { data } = await db.from('routes').select('pts').eq('user_id', uid).eq('id', id).is('deleted_at', null).maybeSingle();
-  return data && Array.isArray(data.pts) && data.pts.length > 1 ? (data.pts as number[][]) : null;
+async function trace(db: Admin, uid: string, id: string) {
+  const { data } = await db.from('routes').select('name,pts').eq('user_id', uid).eq('id', id).is('deleted_at', null).maybeSingle();
+  return data && Array.isArray(data.pts) && data.pts.length > 1 ? { name: String(data.name || ''), pts: data.pts as number[][] } : null;
 }
 
 // message météo d'un trajet (aller : départ à go, ou arrivée à go si go_mode = arr ; retour : départ à back)
 async function wxMsg(db: Admin, r: Row, slot: 'eve' | 'aft', day: string, today: string) {
   const lang = LANGS.includes(String(r.lang)) ? String(r.lang) : 'fr', u = unitsOf(r), tz = r.tz || 'Europe/Paris';
-  const go = await pts(db, r.user_id, r.route_go); if (!go) return null;
-  let p = go;
-  if (slot === 'aft') { const back = r.route_ret ? await pts(db, r.user_id, r.route_ret) : null; p = back || go.slice().reverse(); }
+  const go = await trace(db, r.user_id, r.route_go); if (!go) return null;
+  let p = go.pts, name = go.name;
+  if (slot === 'aft') { const back = r.route_ret ? await trace(db, r.user_id, r.route_ret) : null; p = back ? back.pts : go.pts.slice().reverse(); if (back) name = back.name; }
   const R = route(p), speed = Math.min(45, Math.max(10, Number(r.speed) || 20)), vam = Math.min(1500, Math.max(250, Number(r.vam) || 700));
   const ahead = Math.round((Date.parse(day) - Date.parse(today)) / 864e5);
   const wx = await weather(R.smp, addDays(day, -1), addDays(day, 1), ahead <= 2);
@@ -75,7 +75,9 @@ async function wxMsg(db: Admin, r: Row, slot: 'eve' | 'aft', day: string, today:
   const ressenti = Math.round(s.amin) === Math.round(s.amax) ? T('ressenti {0} °C', [cv.t(u, s.amin)]) : T('ressenti {0} à {1} °C', [cv.t(u, s.amin), cv.t(u, s.amax)]);
   // pas d'heure d'arrivée (26/11/2026, demande d'Antoine)
   const body = s.miss ? T('Prévision incomplète pour ce parcours.') : `${['🟢', '🟠', '🔴'][v.lvl]} ${v.txt} · ${ressenti}`;
-  return { lang, title: slot === 'eve' ? t(lang, 'Demain {0} · Commute aller', [dep]) : t(lang, 'Retour {0} · Commute', [dep]), body };
+  // titre (26/11/2026, demande d'Antoine) : « Demain 07h45 - nom de la trace » / « Retour 17h30 - nom de la trace »
+  const at = lang === 'en' ? dep : dep.replace(':', 'h');
+  return { lang, title: t(lang, slot === 'eve' ? 'Demain {0} - {1}' : 'Retour {0} - {1}', [at, name || 'Commute']), body };
 }
 
 async function deliver(db: Admin, keys: VapidKeys | null, uid: string, msg: Record<string, unknown>) {
