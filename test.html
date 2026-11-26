@@ -4897,16 +4897,19 @@ function flowLabel() {
   FLOW.rider.setLatLng([p.lat, p.lon]); if (!map.hasLayer(FLOW.rider)) FLOW.rider.addTo(map);
 }
 function flowUpdate(newRun) {
-  if (map && !FLOW.main) { FLOW.main = flowEngine({ map: () => map, time: () => FLOW.t, span: flowSpan, allowed: flowAllowed, status: s => { FLOW.status = s; if (S.tl && flowAllowed()) flowLabel(); } }); map.on('dragstart zoomstart', flowPause); }
+  if (map && !FLOW.main) { FLOW.main = flowEngine({ map: () => map, time: () => FLOW.t, span: flowSpan, allowed: flowAllowed, status: s => { FLOW.status = s; if (S.tl && flowAllowed()) flowLabel(); } }); map.on('dragstart', flowPause); map.on('zoomstart', () => { if (FLOW.play && FLOW.pl && performance.now() - FLOW.pl.t0 > 1500) flowPause(); }); }
   if (!flowAllowed() || (newRun && S.tl && FLOW.start !== S.tl.start)) flowPause(); else flowPlayUI(); // nouvel horaire : pause ; simple changement d'onglet (Vent, Pluie…) : la lecture continue
   if (!flowAllowed()) { $('#flowBar').hidden = true; if (FLOW.main) FLOW.main.off(); if (FLOW.rider && map && map.hasLayer(FLOW.rider)) FLOW.rider.remove(); return; }
   $('#flowBar').hidden = false;
   const [a, b] = flowSpan(), r = $('#flowT');
-  if (newRun && FLOW.start !== S.tl.start) { FLOW.start = S.tl.start; FLOW.t = Math.round(S.tl.start / 900e3) * 900e3; }
+  if (newRun && FLOW.start !== S.tl.start) { FLOW.start = S.tl.start; FLOW.t = Math.round(S.tl.start / 900e3) * 900e3; FLOW.auto = 1; }
   if (FLOW.t == null) FLOW.t = Math.round(S.tl.start / 900e3) * 900e3;
   FLOW.t = clamp(FLOW.t, a, b); FLOW.a = a;
   r.max = Math.round((b - a) / 900e3); r.value = Math.round((FLOW.t - a) / 900e3);
   flowLabel(); FLOW.main.load();
+  // démarrage automatique (demande d'Antoine, 26/11/2026) : à chaque nouveau calcul (ouverture de la page, parcours chargé,
+  // nouvel horaire), la lecture ▶ part toute seule ; jamais si « Animation » est décochée ou si les mouvements sont réduits
+  if (FLOW.auto) { FLOW.auto = 0; clearTimeout(FLOW.autoT); FLOW.autoT = setTimeout(() => { if (!FLOW.play && flowAllowed() && flowPlayable()) flowPlay(); }, 500); }
 }
 function flowSetOn(on) {
   FLOW.on = on; $('#flowOn').checked = on; $('#flowOn2').checked = on;
@@ -4926,7 +4929,7 @@ function flowPlayUI() {
   const lbl = on ? T("Mettre en pause le défilement du vent") : T("Faire défiler le vent de ton départ à ton arrivée");
   b.title = lbl; b.setAttribute('aria-label', lbl);
 }
-function flowPause() { if (FLOW.play) { cancelAnimationFrame(FLOW.play); FLOW.play = 0; } flowPlayUI(); }
+function flowPause() { clearTimeout(FLOW.autoT); if (FLOW.play) { cancelAnimationFrame(FLOW.play); FLOW.play = 0; } flowPlayUI(); }
 function flowPlayFrame(now) {
   if (!S.tl || !flowAllowed() || !flowPlayable()) { flowPause(); return; }
   const P = FLOW.pl, a = S.tl.start, z = S.tl.end;
@@ -4943,7 +4946,7 @@ function flowPlay() {
   if (!S.tl || !flowAllowed() || !flowPlayable()) return;
   const a = S.tl.start, z = S.tl.end;
   if (FLOW.t == null || FLOW.t < a || FLOW.t >= z) FLOW.t = a; // avant le départ ou à l'arrivée : on part du départ
-  FLOW.pl = { dur: clamp((z - a) / 3600e3 * 1500, 12000, 90000), last: 0, wind: 0, hold: 0 };
+  FLOW.pl = { dur: clamp((z - a) / 3600e3 * 1500, 12000, 90000), last: 0, wind: 0, hold: 0, t0: performance.now() };
   FLOW.play = requestAnimationFrame(flowPlayFrame); flowPlayUI();
 }
 $('#flowPlay').addEventListener('click', flowPlay);
