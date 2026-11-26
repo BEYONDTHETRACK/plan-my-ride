@@ -56,7 +56,7 @@ async function pts(db: Admin, uid: string, id: string) {
 
 // message météo d'un trajet (aller : départ à go, ou arrivée à go si go_mode = arr ; retour : départ à back)
 async function wxMsg(db: Admin, r: Row, slot: 'eve' | 'aft', day: string, today: string) {
-  const lang = LANGS.includes(String(r.lang)) ? String(r.lang) : 'fr', u = unitsOf(r), tz = r.tz || 'Europe/Paris', loc = lang === 'en' ? 'en-GB' : 'fr-FR';
+  const lang = LANGS.includes(String(r.lang)) ? String(r.lang) : 'fr', u = unitsOf(r), tz = r.tz || 'Europe/Paris';
   const go = await pts(db, r.user_id, r.route_go); if (!go) return null;
   let p = go;
   if (slot === 'aft') { const back = r.route_ret ? await pts(db, r.user_id, r.route_ret) : null; p = back || go.slice().reverse(); }
@@ -71,10 +71,10 @@ async function wxMsg(db: Admin, r: Row, slot: 'eve' | 'aft', day: string, today:
     s = ride(R, wx, zoned(day, dep, tz), speed, vam); dep = toHm(mins(tm.go) - Math.round(s.rideH * 60) - (Number(r.margin) || 0));
   }
   const s = ride(R, wx, zoned(day, dep, tz), speed, vam), v = verdict(s, lang, u);
-  const fmt = (ms: number) => new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit', timeZone: tz }).format(new Date(ms));
   const T = (k: string, a?: (string | number)[]) => tr(lang, k, a, u);
   const ressenti = Math.round(s.amin) === Math.round(s.amax) ? T('ressenti {0} °C', [cv.t(u, s.amin)]) : T('ressenti {0} à {1} °C', [cv.t(u, s.amin), cv.t(u, s.amax)]);
-  const body = s.miss ? T('Prévision incomplète pour ce parcours.') : `${['🟢', '🟠', '🔴'][v.lvl]} ${v.txt} · ${ressenti} · ${t(lang, 'arrivée vers {0}', [fmt(s.endMs)])}`;
+  // pas d'heure d'arrivée (26/11/2026, demande d'Antoine)
+  const body = s.miss ? T('Prévision incomplète pour ce parcours.') : `${['🟢', '🟠', '🔴'][v.lvl]} ${v.txt} · ${ressenti}`;
   return { lang, title: slot === 'eve' ? t(lang, 'Demain {0} · Commute aller', [dep]) : t(lang, 'Retour {0} · Commute', [dep]), body };
 }
 
