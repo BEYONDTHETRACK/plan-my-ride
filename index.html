@@ -2243,6 +2243,7 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
       <div class="flow-bar" id="flowBar" hidden>
         <span class="flow-lbl">Vent à <b id="flowLbl"></b> <span class="hint" id="flowPos"></span></span>
         <input type="range" id="flowT" min="0" max="1" step="1" aria-label="Heure du vent animé">
+        <button type="button" class="btn small" id="flowPlay" aria-pressed="false" title="Faire défiler le vent de ton départ à ton arrivée" aria-label="Faire défiler le vent de ton départ à ton arrivée">▶</button>
         <button type="button" class="btn small" id="flowDep" title="Revenir à l'heure de départ">Mon départ</button>
       </div>
       <div class="legend" id="legend"></div>
@@ -4501,21 +4502,36 @@ function flowSpan() {
 }
 const FLOW_GRIDS = [], FLOW_PENDING = new Map();
 // grille de vent couvrant la vue vb pour les jours d0 … d1 (déjà chargée, en cours de chargement, ou demandée)
-async function flowGrid(vb, d0, d1) {
-  const ok = g => g.d0 <= d0 && g.d1 >= d1 && g.bounds.contains(vb) && (g.lat1 - g.lat0) < (vb.getNorth() - vb.getSouth()) * 4;
+// Modèle Open-Meteo de la source utilisée pour le parcours (26/11/2026) : le vent animé suit le même modèle que les
+// flèches de la trace. Open-Meteo automatique (null) pour Open-Meteo, meteoblue et la démo.
+function flowModel() {
+  const k = String(S.wxUsed || '').split('+')[0];
+  return k === 'met' ? 'metno_seamless' : OM_MODELS[k] ? OM_MODELS[k].models[0] : null;
+}
+async function flowGrid(vb, d0, d1, model = flowModel()) {
+  const ok = g => g.d0 <= d0 && g.d1 >= d1 && (g.model || null) === model && g.bounds.contains(vb) && (g.lat1 - g.lat0) < (vb.getNorth() - vb.getSouth()) * 4;
   const hit = FLOW_GRIDS.find(ok); if (hit) return hit;
   for (const [g, pr] of FLOW_PENDING) if (ok(g)) return pr;
   const pad = vb.pad(0.35), N = 9, lat0 = pad.getSouth(), lat1 = pad.getNorth(), lon0 = pad.getWest(), lon1 = pad.getEast(), la = [], lo = [];
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { la.push((lat0 + (lat1 - lat0) * i / (N - 1)).toFixed(3)); lo.push((lon0 + (lon1 - lon0) * j / (N - 1)).toFixed(3)); }
-  const meta = { N, lat0, lat1, lon0, lon1, d0, d1, bounds: L.latLngBounds([lat0, lon0], [lat1, lon1]) };
-  const pr = (async () => {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${la.join(',')}&longitude=${lo.join(',')}&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=kmh&timeformat=unixtime&timezone=GMT&start_date=${d0}&end_date=${d1}`;
+  const meta = { N, lat0, lat1, lon0, lon1, d0, d1, model, bounds: L.latLngBounds([lat0, lon0], [lat1, lon1]) };
+  const get = async mdl => {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${la.join(',')}&longitude=${lo.join(',')}&hourly=wind_speed_10m,wind_direction_10m${mdl ? '&models=' + mdl : ''}&wind_speed_unit=kmh&timeformat=unixtime&timezone=GMT&start_date=${d0}&end_date=${d1}`;
     const res = await omFetch(url, 30000);
     const js = await res.json(), arr = Array.isArray(js) ? js : [js];
     if (!res.ok || arr.length !== N * N || arr.some(x => !x || !x.hourly)) throw new Error(T("réponse incomplète"));
+    return arr;
+  };
+  const pr = (async () => {
+    // modèle du parcours ; trous (hors de sa zone, au-delà de son échéance) comblés par Open-Meteo automatique, comme pour la trace
+    let arr = model ? await get(model).catch(() => null) : null, alt = null;
+    if (!arr) arr = await get(null);
+    else if (arr.some(L0 => L0.hourly.wind_speed_10m.some(x => x == null))) alt = await get(null).catch(() => null);
     const t0 = arr[0].hourly.time[0], n = arr[0].hourly.time.length, u = new Float32Array(N * N * n), v = new Float32Array(N * N * n);
-    arr.forEach((L0, k) => { const ws = L0.hourly.wind_speed_10m, wd = L0.hourly.wind_direction_10m;
-      for (let h = 0; h < n; h++) { const s = ws[h] || 0, d = (wd[h] || 0) * RAD; u[k * n + h] = -s * Math.sin(d); v[k * n + h] = -s * Math.cos(d); } }); // vers où va le vent
+    arr.forEach((L0, k) => { let ws = L0.hourly.wind_speed_10m, wd = L0.hourly.wind_direction_10m; const B = alt && alt[k] && alt[k].hourly;
+      for (let h = 0; h < n; h++) {
+        let s = ws[h], dd = wd[h]; if ((s == null || dd == null) && B && B.time[h] === L0.hourly.time[h]) { s = B.wind_speed_10m[h]; dd = B.wind_direction_10m[h]; }
+        s = s || 0; const d = (dd || 0) * RAD; u[k * n + h] = -s * Math.sin(d); v[k * n + h] = -s * Math.cos(d); } }); // vers où va le vent
     const g = { ...meta, n, t0, u, v }; FLOW_GRIDS.unshift(g); FLOW_GRIDS.length = Math.min(FLOW_GRIDS.length, 6);
     return g;
   })();
@@ -4536,13 +4552,14 @@ function flowEngine(o) {
     const d0 = ymd(new Date(Math.max(a, today.getTime() - 60 * 864e5))), d1 = ymd(new Date(Math.min(b, lastDay.getTime())));
     if (d0 > d1) { o.status(T("pas de prévision à cette date")); E.off(); return; }
     const seq = ++E.seq, vb = m.getBounds();
-    const quick = FLOW_GRIDS.find(g => g.d0 <= d0 && g.d1 >= d1 && g.bounds.contains(vb) && (g.lat1 - g.lat0) < (vb.getNorth() - vb.getSouth()) * 4);
+    const mdl = flowModel(), quick = FLOW_GRIDS.find(g => g.d0 <= d0 && g.d1 >= d1 && (g.model || null) === mdl && g.bounds.contains(vb) && (g.lat1 - g.lat0) < (vb.getNorth() - vb.getSouth()) * 4);
     if (!quick) o.status(T("chargement du vent…"));
-    try { const g = await flowGrid(vb, d0, d1); if (seq !== E.seq) return; E.grid = g; o.status(''); E.build(); }
+    // même grille qu'avant (changement d'heure, petit déplacement) : les particules continuent, sans repartir de zéro
+    try { const g = await flowGrid(vb, d0, d1, mdl); if (seq !== E.seq) return; const same = g === E.grid; E.grid = g; o.status(''); E.build(same); }
     catch (e) { if (seq === E.seq) { o.status(T("vent animé indisponible")); E.off(); } }
   };
   // champ de vent à l'écran pour l'heure choisie (cases de 10 px), puis particules
-  E.build = () => {
+  E.build = keep => {
     const g = E.grid; if (!g || !o.allowed()) return;
     const size = m.getSize(); if (!size.x || !size.y) return;
     const cs = E.cell, cols = Math.ceil(size.x / cs) + 1, rows = Math.ceil(size.y / cs) + 1;
@@ -4556,9 +4573,16 @@ function flowEngine(o) {
       const bil = arr => (at(arr, k00) * (1 - dj) + at(arr, k01) * dj) * (1 - di) + (at(arr, k10) * (1 - dj) + at(arr, k11) * dj) * di;
       U[r * cols + c] = bil(g.u); V[r * cols + c] = bil(g.v);
     }
+    const old = E.field;
     E.field = { cols, rows, U, V, w: size.x, h: size.y };
     if (!E.cv) E.cv = L.DomUtil.create('canvas', 'flow-cv', m.getPane('flowPane'));
     const cv = E.cv, dpr = window.devicePixelRatio || 1;
+    // nouvelle heure sur la même vue (lecture ▶, curseur) : seul le champ change, les traînées restent
+    if (keep && old && old.w === size.x && old.h === size.y && E.parts.length && cv.style.opacity !== '0') {
+      L.DomUtil.setPosition(cv, m.containerPointToLayerPoint([0, 0]));
+      if (!E.raf) { E.frames = 0; E.raf = requestAnimationFrame(E.frame); }
+      return;
+    }
     cv.width = size.x * dpr; cv.height = size.y * dpr; cv.style.width = size.x + 'px'; cv.style.height = size.y + 'px';
     L.DomUtil.setPosition(cv, m.containerPointToLayerPoint([0, 0]));
     cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0); cv.style.opacity = 1;
@@ -4597,33 +4621,75 @@ function flowHide() { if (FLOW.main) FLOW.main.hide(); }
 function flowLabel() {
   const t = FLOW.t, tl = S.tl, P = S.P;
   $('#flowLbl').textContent = whenTxt(t, tl.start);
-  let i = 0; { const TT = tl.times; let lo = 0, hi = P.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (TT[m] < t) lo = m + 1; else hi = m; } i = lo; }
-  $('#flowPos').textContent = FLOW.status ? '· ' + FLOW.status : t < tl.start ? T("· avant le départ") : t > tl.end ? T("· après l'arrivée") : T("· tu es au km {0}", [fD(P.d[i], 0)]);
-  const p = P.pts[t <= tl.start ? 0 : t >= tl.end ? P.n - 1 : i];
+  const TT = tl.times; let i = 0; { let lo = 0, hi = P.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (TT[m] < t) lo = m + 1; else hi = m; } i = lo; }
+  // position entre deux points de la trace, au prorata du temps (le point glisse au lieu de sauter)
+  const j = t <= tl.start ? 0 : t >= tl.end ? P.n - 1 : i, q = P.pts[j], o = P.pts[Math.max(0, j - 1)];
+  const f = j > 0 && TT[j] > TT[j - 1] ? clamp((t - TT[j - 1]) / (TT[j] - TT[j - 1]), 0, 1) : 1;
+  const p = { lat: o.lat + (q.lat - o.lat) * f, lon: o.lon + (q.lon - o.lon) * f }, km = j > 0 ? P.d[j - 1] + (P.d[j] - P.d[j - 1]) * f : P.d[0];
+  $('#flowPos').textContent = FLOW.status ? '· ' + FLOW.status : t < tl.start ? T("· avant le départ") : t > tl.end ? T("· après l'arrivée") : T("· tu es au km {0}", [fD(km, 0)]);
   if (!FLOW.rider) FLOW.rider = L.circleMarker([p.lat, p.lon], { radius: 7, color: '#fff', weight: 3, fillColor: '#111', fillOpacity: 1, pane: 'markerPane' }).bindTooltip(T("Toi à l'heure choisie"));
   FLOW.rider.setLatLng([p.lat, p.lon]); if (!map.hasLayer(FLOW.rider)) FLOW.rider.addTo(map);
 }
 function flowUpdate(newRun) {
-  if (map && !FLOW.main) FLOW.main = flowEngine({ map: () => map, time: () => FLOW.t, span: flowSpan, allowed: flowAllowed, status: s => { FLOW.status = s; if (S.tl && flowAllowed()) flowLabel(); } });
+  if (map && !FLOW.main) { FLOW.main = flowEngine({ map: () => map, time: () => FLOW.t, span: flowSpan, allowed: flowAllowed, status: s => { FLOW.status = s; if (S.tl && flowAllowed()) flowLabel(); } }); map.on('dragstart', flowPause); map.on('zoomstart', () => { if (FLOW.play && FLOW.pl && performance.now() - FLOW.pl.t0 > 1500) flowPause(); }); }
+  if (!flowAllowed() || (newRun && S.tl && FLOW.start !== S.tl.start)) flowPause(); else flowPlayUI(); // nouvel horaire : pause ; simple changement d'onglet (Vent, Pluie…) : la lecture continue
   if (!flowAllowed()) { $('#flowBar').hidden = true; if (FLOW.main) FLOW.main.off(); if (FLOW.rider && map && map.hasLayer(FLOW.rider)) FLOW.rider.remove(); return; }
   $('#flowBar').hidden = false;
   const [a, b] = flowSpan(), r = $('#flowT');
-  if (newRun && FLOW.start !== S.tl.start) { FLOW.start = S.tl.start; FLOW.t = Math.round(S.tl.start / 900e3) * 900e3; }
+  if (newRun && FLOW.start !== S.tl.start) { FLOW.start = S.tl.start; FLOW.t = Math.round(S.tl.start / 900e3) * 900e3; FLOW.auto = 1; }
   if (FLOW.t == null) FLOW.t = Math.round(S.tl.start / 900e3) * 900e3;
   FLOW.t = clamp(FLOW.t, a, b); FLOW.a = a;
   r.max = Math.round((b - a) / 900e3); r.value = Math.round((FLOW.t - a) / 900e3);
   flowLabel(); FLOW.main.load();
+  // démarrage automatique (demande d'Antoine, 26/11/2026) : à chaque nouveau calcul (ouverture de la page, parcours chargé,
+  // nouvel horaire), la lecture ▶ part toute seule ; jamais si « Animation » est décochée ou si les mouvements sont réduits
+  if (FLOW.auto) { FLOW.auto = 0; clearTimeout(FLOW.autoT); FLOW.autoT = setTimeout(() => { if (!FLOW.play && flowAllowed() && flowPlayable()) flowPlay(); }, 500); }
 }
 function flowSetOn(on) {
   FLOW.on = on; $('#flowOn').checked = on; $('#flowOn2').checked = on;
   try { localStorage.setItem('pmr-flow', on ? '1' : '0'); } catch (e) {}
-  flowUpdate(false); duoFlows();
+  flowUpdate(false); duoFlows(); if (S.wx) renderLegend();
 }
-$('#flowT').addEventListener('input', () => { FLOW.t = FLOW.a + (+$('#flowT').value) * 900e3; flowLabel(); if (FLOW.main) FLOW.main.load(); });
-$('#flowDep').addEventListener('click', () => { FLOW.t = Math.round(S.tl.start / 900e3) * 900e3; flowUpdate(false); });
+/* Lecture ▶ (26/11/2026) : le point du cycliste glisse sur toute la trace, sans à-coups, du départ à l'arrivée, puis
+   repart du départ (courte pause à l'arrivée). Durée de la lecture : 1,5 s par heure de route, entre 12 s et 90 s.
+   L'heure avance à chaque image ; le vent animé suit (champ recalculé 4 fois par seconde, interpolé dans le temps).
+   Pause : bouton, curseur, « Mon départ », carte déplacée ou zoomée, vent animé coupé, nouvel horaire. Pas de lecture
+   si « Animation » est décochée ou si les mouvements sont réduits. */
+const flowPlayable = () => $('#animOn').checked && !reducedMotion();
+function flowPlayUI() {
+  const b = $('#flowPlay'); if (!b) return;
+  b.hidden = !flowPlayable(); const on = !!FLOW.play;
+  b.textContent = on ? '❚❚' : '▶'; b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  const lbl = on ? T("Mettre en pause le défilement du vent") : T("Faire défiler le vent de ton départ à ton arrivée");
+  b.title = lbl; b.setAttribute('aria-label', lbl);
+}
+function flowPause() { clearTimeout(FLOW.autoT); if (FLOW.play) { cancelAnimationFrame(FLOW.play); FLOW.play = 0; } flowPlayUI(); }
+function flowPlayFrame(now) {
+  if (!S.tl || !flowAllowed() || !flowPlayable()) { flowPause(); return; }
+  const P = FLOW.pl, a = S.tl.start, z = S.tl.end;
+  const dt = Math.min(100, now - (P.last || now)); P.last = now; // onglet caché puis revenu : pas de saut
+  if (P.hold > 0) { P.hold -= dt; if (P.hold <= 0) FLOW.t = a; }
+  else { FLOW.t += dt * (z - a) / P.dur; if (FLOW.t >= z) { FLOW.t = z; P.hold = 900; } }
+  $('#flowT').value = Math.round((FLOW.t - FLOW.a) / 900e3);
+  flowLabel();
+  if (FLOW.main && now - (P.wind || 0) > 250) { P.wind = now; FLOW.main.load(); }
+  FLOW.play = requestAnimationFrame(flowPlayFrame);
+}
+function flowPlay() {
+  if (FLOW.play) { flowPause(); return; }
+  if (!S.tl || !flowAllowed() || !flowPlayable()) return;
+  const a = S.tl.start, z = S.tl.end;
+  if (FLOW.t == null || FLOW.t < a || FLOW.t >= z) FLOW.t = a; // avant le départ ou à l'arrivée : on part du départ
+  FLOW.pl = { dur: clamp((z - a) / 3600e3 * 1500, 12000, 90000), last: 0, wind: 0, hold: 0, t0: performance.now() };
+  FLOW.play = requestAnimationFrame(flowPlayFrame); flowPlayUI();
+}
+$('#flowPlay').addEventListener('click', flowPlay);
+$('#flowT').addEventListener('input', () => { flowPause(); FLOW.t = FLOW.a + (+$('#flowT').value) * 900e3; flowLabel(); if (FLOW.main) FLOW.main.load(); });
+$('#flowDep').addEventListener('click', () => { flowPause(); FLOW.t = Math.round(S.tl.start / 900e3) * 900e3; flowUpdate(false); });
+try { matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => { if (!flowPlayable()) flowPause(); flowPlayUI(); }); } catch (e) {}
 $('#flowOn').addEventListener('change', () => flowSetOn($('#flowOn').checked));
 $('#flowOn2').addEventListener('change', () => flowSetOn($('#flowOn2').checked));
-$('#animOn').addEventListener('change', () => { if (FLOW.main) FLOW.main.wake(); for (const f of DUO.flows) if (f) f.wake(); });
+$('#animOn').addEventListener('change', () => { if (!flowPlayable()) flowPause(); flowPlayUI(); if (FLOW.main) FLOW.main.wake(); for (const f of DUO.flows) if (f) f.wake(); });
 function renderLegend() {
   const el = $('#legend');
   if (!S.wx) { el.innerHTML = T("<span>Trace sans données météo.</span>"); return; }
@@ -4634,6 +4700,8 @@ function renderLegend() {
   if (S.laps && !S.laps.taf) el.innerHTML += T("<div class=\"wrow\"><span>{0} tours : trace colorée d'après le 1er tour, pas de flèches de vent sur la carte. La météo de chaque tour est sous la carte.</span></div>", [S.laps.n]);
   else if ($('#arrowsOn').checked) el.innerHTML += T("<div class=\"wrow\"><span>Flèches : sens où va le vent · pastille : {0}température et vent à l'heure de passage</span><span>Force<span class=\"wscale\">{1}</span></span></div>", [$('#skyOn').checked ? T('ciel, ') : '', WIND_SCALE.map((w, i) => `<span style="background:${w[1]};color:${w[3]}" title="${w[2]}">${i === WIND_SCALE.length - 1 ? fV(w[0]) + '+' : fV(w[0]) + '–' + fV(WIND_SCALE[i + 1][0])}</span>`).join('')]);
   else if ($('#skyOn').checked) el.innerHTML += T("<div class=\"wrow\"><span>Pastilles : ciel (soleil, lune la nuit, nuages, pluie) et température à l'heure de passage</span></div>");
+  // vent animé et flèches ne montrent pas la même heure (26/11/2026) : on le dit
+  if (S.metric === 'wind' && flowAllowed() && !(S.laps && !S.laps.taf)) el.innerHTML += T("<div class=\"wrow\"><span>Vent animé : vent à l'heure du curseur, partout sur la carte · flèches : vent à ton heure de passage à cet endroit</span></div>");
 }
 /* ---------- export image (page Sortie) : carte avec la trace et le vent + profil météo ---------- */
 // L'image reprend la vue actuelle de la carte : zoomer / cadrer avant d'exporter. Les tuiles du fond sont rechargées
