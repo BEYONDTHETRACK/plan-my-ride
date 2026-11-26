@@ -4887,9 +4887,12 @@ function flowHide() { if (FLOW.main) FLOW.main.hide(); }
 function flowLabel() {
   const t = FLOW.t, tl = S.tl, P = S.P;
   $('#flowLbl').textContent = whenTxt(t, tl.start);
-  let i = 0; { const TT = tl.times; let lo = 0, hi = P.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (TT[m] < t) lo = m + 1; else hi = m; } i = lo; }
-  $('#flowPos').textContent = FLOW.status ? '· ' + FLOW.status : t < tl.start ? T("· avant le départ") : t > tl.end ? T("· après l'arrivée") : T("· tu es au km {0}", [fD(P.d[i], 0)]);
-  const p = P.pts[t <= tl.start ? 0 : t >= tl.end ? P.n - 1 : i];
+  const TT = tl.times; let i = 0; { let lo = 0, hi = P.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (TT[m] < t) lo = m + 1; else hi = m; } i = lo; }
+  // position entre deux points de la trace, au prorata du temps (le point glisse au lieu de sauter)
+  const j = t <= tl.start ? 0 : t >= tl.end ? P.n - 1 : i, q = P.pts[j], o = P.pts[Math.max(0, j - 1)];
+  const f = j > 0 && TT[j] > TT[j - 1] ? clamp((t - TT[j - 1]) / (TT[j] - TT[j - 1]), 0, 1) : 1;
+  const p = { lat: o.lat + (q.lat - o.lat) * f, lon: o.lon + (q.lon - o.lon) * f }, km = j > 0 ? P.d[j - 1] + (P.d[j] - P.d[j - 1]) * f : P.d[0];
+  $('#flowPos').textContent = FLOW.status ? '· ' + FLOW.status : t < tl.start ? T("· avant le départ") : t > tl.end ? T("· après l'arrivée") : T("· tu es au km {0}", [fD(km, 0)]);
   if (!FLOW.rider) FLOW.rider = L.circleMarker([p.lat, p.lon], { radius: 7, color: '#fff', weight: 3, fillColor: '#111', fillOpacity: 1, pane: 'markerPane' }).bindTooltip(T("Toi à l'heure choisie"));
   FLOW.rider.setLatLng([p.lat, p.lon]); if (!map.hasLayer(FLOW.rider)) FLOW.rider.addTo(map);
 }
@@ -4910,9 +4913,11 @@ function flowSetOn(on) {
   try { localStorage.setItem('pmr-flow', on ? '1' : '0'); } catch (e) {}
   flowUpdate(false); duoFlows(); if (S.wx) renderLegend();
 }
-/* Lecture ▶ (26/11/2026) : l'heure avance de 15 min toutes les 0,5 s, du départ à l'arrivée, puis repart du départ.
-   Le point du cycliste suit la trace. Pause : bouton, curseur, « Mon départ », carte déplacée ou zoomée, vent animé
-   coupé, nouveau calcul. Pas de lecture si « Animation » est décochée ou si les mouvements sont réduits. */
+/* Lecture ▶ (26/11/2026) : le point du cycliste glisse sur toute la trace, sans à-coups, du départ à l'arrivée, puis
+   repart du départ (courte pause à l'arrivée). Durée de la lecture : 1,5 s par heure de route, entre 12 s et 90 s.
+   L'heure avance à chaque image ; le vent animé suit (champ recalculé 4 fois par seconde, interpolé dans le temps).
+   Pause : bouton, curseur, « Mon départ », carte déplacée ou zoomée, vent animé coupé, nouvel horaire. Pas de lecture
+   si « Animation » est décochée ou si les mouvements sont réduits. */
 const flowPlayable = () => $('#animOn').checked && !reducedMotion();
 function flowPlayUI() {
   const b = $('#flowPlay'); if (!b) return;
@@ -4921,20 +4926,25 @@ function flowPlayUI() {
   const lbl = on ? T("Mettre en pause le défilement du vent") : T("Faire défiler le vent de ton départ à ton arrivée");
   b.title = lbl; b.setAttribute('aria-label', lbl);
 }
-function flowPause() { if (FLOW.play) { clearInterval(FLOW.play); FLOW.play = 0; } flowPlayUI(); }
-function flowPlayStep() {
+function flowPause() { if (FLOW.play) { cancelAnimationFrame(FLOW.play); FLOW.play = 0; } flowPlayUI(); }
+function flowPlayFrame(now) {
   if (!S.tl || !flowAllowed() || !flowPlayable()) { flowPause(); return; }
-  const a = Math.round(S.tl.start / 900e3) * 900e3, z = Math.round(S.tl.end / 900e3) * 900e3;
-  FLOW.t = FLOW.t == null || FLOW.t < a || FLOW.t >= z ? a : FLOW.t + 900e3;
+  const P = FLOW.pl, a = S.tl.start, z = S.tl.end;
+  const dt = Math.min(100, now - (P.last || now)); P.last = now; // onglet caché puis revenu : pas de saut
+  if (P.hold > 0) { P.hold -= dt; if (P.hold <= 0) FLOW.t = a; }
+  else { FLOW.t += dt * (z - a) / P.dur; if (FLOW.t >= z) { FLOW.t = z; P.hold = 900; } }
   $('#flowT').value = Math.round((FLOW.t - FLOW.a) / 900e3);
-  flowLabel(); if (FLOW.main) FLOW.main.load();
+  flowLabel();
+  if (FLOW.main && now - (P.wind || 0) > 250) { P.wind = now; FLOW.main.load(); }
+  FLOW.play = requestAnimationFrame(flowPlayFrame);
 }
 function flowPlay() {
   if (FLOW.play) { flowPause(); return; }
   if (!S.tl || !flowAllowed() || !flowPlayable()) return;
-  if (FLOW.t == null || FLOW.t >= Math.round(S.tl.end / 900e3) * 900e3) FLOW.t = null; // à l'arrivée : on repart du départ
-  else FLOW.t -= 900e3; // premier pas = heure actuelle du curseur
-  FLOW.play = setInterval(flowPlayStep, 500); flowPlayUI(); flowPlayStep();
+  const a = S.tl.start, z = S.tl.end;
+  if (FLOW.t == null || FLOW.t < a || FLOW.t >= z) FLOW.t = a; // avant le départ ou à l'arrivée : on part du départ
+  FLOW.pl = { dur: clamp((z - a) / 3600e3 * 1500, 12000, 90000), last: 0, wind: 0, hold: 0 };
+  FLOW.play = requestAnimationFrame(flowPlayFrame); flowPlayUI();
 }
 $('#flowPlay').addEventListener('click', flowPlay);
 $('#flowT').addEventListener('input', () => { flowPause(); FLOW.t = FLOW.a + (+$('#flowT').value) * 900e3; flowLabel(); if (FLOW.main) FLOW.main.load(); });
