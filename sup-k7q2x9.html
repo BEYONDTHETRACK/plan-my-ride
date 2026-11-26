@@ -67,8 +67,12 @@ h1{margin:0;font-family:var(--f-display);font-weight:800;font-size:44px;letter-s
 .b.bad{color:var(--bad);border-color:var(--bad-line)}
 .b[disabled]{opacity:.5;cursor:default}
 
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
-.tabs a{padding:10px 16px;font-weight:600;font-size:15px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs a{padding:10px 16px;font-weight:600;font-size:15px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;flex:none}
+.nemo{display:flex;flex-wrap:wrap;gap:4px;margin-top:-4px}
+.nemo button{min-width:40px;min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:20px;line-height:1;cursor:pointer;padding:0}
+.nemo button:hover{background:var(--surface-2)}
+#nReach{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .tabs a[aria-current=page]{font-weight:700;color:var(--accent);border-bottom-color:var(--accent)}
 
 .todo{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
@@ -367,6 +371,7 @@ dialog h2{margin-bottom:6px}
       <a href="#" data-tab="over" aria-current="page">Vue d'ensemble</a>
       <a href="#analytics" data-tab="ana">Analytics</a>
       <a href="#points" data-tab="poi">Points et avis<span class="cnt" id="poiCnt" hidden></span></a>
+      <a href="#notifications" data-tab="ntf">Notifications</a>
     </nav>
 
     <!-- ===== Vue d'ensemble ===== -->
@@ -476,6 +481,37 @@ dialog h2{margin-bottom:6px}
       <div class="pbar"><div class="seg" id="pSub" role="group" aria-label="Contenu"><button type="button" data-sub="points" aria-pressed="true">Points</button><button type="button" data-sub="reviews" aria-pressed="false">Avis</button></div><div class="pchips" id="pFilters" role="group" aria-label="Filtre"></div></div>
       <p class="msg err" id="pMsg" aria-live="polite" style="margin:0"></p>
       <ul class="plist" id="pList"></ul>
+    </div>
+    <!-- ===== Notifications envoyées à la main (25/11/2026) ===== -->
+    <div id="ntf" hidden style="display:flex;flex-direction:column;gap:18px">
+      <p class="msg" style="margin:0;font-size:15px">Envoie un message tout de suite sur les téléphones et navigateurs où les alertes météo sont activées. Il arrive comme une notification Sillage ; le toucher ouvre l'app.</p>
+      <section class="kpis" id="nReach" aria-label="Appareils joignables"></section>
+      <section class="card pad" aria-labelledby="h-nsend">
+        <h2 id="h-nsend">Nouveau message</h2>
+        <form class="form" id="nForm" autocomplete="off" style="max-width:560px">
+          <label class="f">Titre<input class="in" id="nTitle" maxlength="80" required placeholder="ex. Nouveauté dans Sillage"></label>
+          <label class="f">Message<textarea class="in" id="nBody" maxlength="300" rows="3" required style="padding:10px 12px;min-height:84px;font:inherit;resize:vertical"></textarea><span class="muted" id="nCount" style="font-weight:400">0 / 300</span></label>
+          <div class="nemo" id="nEmo" role="group" aria-label="Ajouter un emoji (dans le titre ou le message, là où est le curseur)"></div>
+          <label class="f">Lien ouvert au toucher (facultatif, une adresse de l'app)<input class="in" id="nUrl" maxlength="300" placeholder="https://app.sillage-ride.eu/"></label>
+          <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:6px"><legend class="muted" style="font-size:13px;font-weight:600;padding:0;margin-bottom:4px">Envoyer à</legend>
+            <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="radio" name="nTo" value="all" checked> Tout le monde</label>
+            <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="radio" name="nTo" value="one"> Un seul compte</label>
+            <input type="email" class="in" id="nEmail" maxlength="200" placeholder="e-mail du compte" hidden>
+          </fieldset>
+          <fieldset style="border:0;padding:0;margin:0;display:flex;gap:16px;flex-wrap:wrap"><legend class="muted" style="font-size:13px;font-weight:600;padding:0;margin-bottom:6px">Appareils</legend>
+            <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" name="nPf" value="ios" checked> iPhone</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" name="nPf" value="android" checked> Android</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" name="nPf" value="web" checked> Navigateur</label>
+          </fieldset>
+          <p class="msg err" id="nErr" hidden></p>
+          <div class="done" id="nDone" hidden></div>
+          <div class="dbtns" style="justify-content:flex-start;gap:10px;display:flex;flex-wrap:wrap"><button class="b pri" id="nGo" type="submit">Envoyer</button><button class="b bad ask" id="nSure" type="button" hidden>Confirmer l'envoi à tout le monde</button></div>
+        </form>
+      </section>
+      <section class="card pad" aria-labelledby="h-nhist">
+        <h2 id="h-nhist">Derniers envois</h2>
+        <div style="overflow-x:auto"><table class="osmrank"><thead><tr><th>Quand</th><th>Message</th><th>À</th><th class="num">Reçus</th></tr></thead><tbody id="nHist"></tbody></table></div>
+      </section>
     </div>
   </div>
 </main>
@@ -1413,20 +1449,74 @@ $('pSub').addEventListener('click', e => { const b = e.target.closest('[data-sub
 $('pOsmP').addEventListener('click', e => { const b = e.target.closest('[data-osmp]'); if (!b) return; P.osmP = b.dataset.osmp; pOsmRender(); });
 $('pFilters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; P.filter = b.dataset.f; P.ask = ''; pRender(); });
 
+/* ---------- notifications envoyées à la main (fonction push-alerts, actions admin_reach / admin_send) ---------- */
+const N = { loaded: false, busy: false };
+const nFn = async (action, extra) => {
+  const { data, error } = await sb.functions.invoke('push-alerts', { body: { action, ...(extra || {}) } });
+  if (error) { let d = ''; try { const j = await error.context.json(); d = j.detail || j.error || ''; } catch (e) {} throw new Error(d || error.message); }
+  return data;
+};
+const nPlat = { ios: 'iPhone', android: 'Android', web: 'Navigateur' };
+async function nLoad(){
+  N.loaded = true;
+  try {
+    const r = await nFn('admin_reach');
+    $('nReach').innerHTML = [['Comptes joignables', r.users], ['iPhone', r.ios], ['Android', r.android], ['Navigateurs', r.web]]
+      .map(([k, v]) => '<div class="kpi"><div class="l">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></div>').join('');
+  } catch(e){ $('nReach').innerHTML = '<p class="msg err">Appareils : ' + esc(e.message || e) + '</p>'; }
+  const { data, error } = await sb.from('push_broadcasts').select('*').order('created_at', { ascending: false }).limit(30);
+  $('nHist').innerHTML = error ? '<tr><td colspan="4" class="msg err">' + esc(error.message) + '</td></tr>'
+    : !data.length ? '<tr><td colspan="4" class="muted">Aucun envoi pour l\'instant.</td></tr>'
+    : data.map(b => '<tr><td>' + esc(dsFmt.format(new Date(b.created_at))) + ' ' + esc(new Date(b.created_at).toTimeString().slice(0, 5)) + '</td><td><b>' + esc(b.title) + '</b><br><span class="muted">' + esc(b.body) + '</span></td><td>' + esc(b.target === 'all' ? 'Tout le monde' : b.target) + '<br><span class="muted">' + esc((b.platforms || []).map(p => nPlat[p] || p).join(', ')) + '</span></td><td class="num">' + esc(b.sent) + ' / ' + esc(b.devices) + '</td></tr>').join('');
+}
+const nTo = () => document.querySelector('input[name="nTo"]:checked').value;
+// Emojis (25/11/2026) : un clic insère l'emoji à la place du curseur, dans le titre ou le message (le dernier champ touché).
+const N_EMO = ['👋','🚴','🚵','☀️','🌤️','⛅','🌧️','⛈️','❄️','💨','🌡️','⚠️','🎉','🔥','✨','💪','🏔️','🗺️','📍','🔔','🆕','✅','❤️','🙏'];
+let nLast = $('nBody');
+$('nTitle').addEventListener('focus', () => { nLast = $('nTitle'); });
+$('nBody').addEventListener('focus', () => { nLast = $('nBody'); });
+$('nEmo').innerHTML = N_EMO.map(e => '<button type="button" title="Ajouter ' + e + '">' + e + '</button>').join('');
+$('nEmo').addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); }); // garde le curseur dans le champ
+$('nEmo').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+  const f = nLast, a = f.selectionStart ?? f.value.length, z = f.selectionEnd ?? a, add = b.textContent;
+  if (f.maxLength > 0 && f.value.length - (z - a) + add.length > f.maxLength) return;
+  f.value = f.value.slice(0, a) + add + f.value.slice(z); f.focus(); f.setSelectionRange(a + add.length, a + add.length);
+  f.dispatchEvent(new Event('input')); });
+$('nBody').addEventListener('input', () => { $('nCount').textContent = $('nBody').value.length + ' / 300'; });
+document.querySelectorAll('input[name="nTo"]').forEach(r => r.addEventListener('change', () => { $('nEmail').hidden = nTo() !== 'one'; $('nEmail').required = nTo() === 'one'; $('nSure').hidden = true; }));
+async function nSend(){
+  if (N.busy) return; N.busy = true;
+  $('nErr').hidden = true; $('nDone').hidden = true; $('nGo').disabled = true; $('nSure').disabled = true;
+  try {
+    const platforms = [...document.querySelectorAll('input[name="nPf"]:checked')].map(i => i.value);
+    const r = await nFn('admin_send', { title: $('nTitle').value, body: $('nBody').value, url: $('nUrl').value, to: nTo() === 'all' ? 'all' : $('nEmail').value, platforms });
+    $('nDone').hidden = false;
+    $('nDone').textContent = r.devices ? 'Envoyé : ' + r.sent + ' appareil' + (r.sent > 1 ? 's' : '') + ' sur ' + r.devices + ' l\'ont accepté.' : 'Aucun appareil joignable pour ce choix : rien n\'est parti.';
+    $('nSure').hidden = true;
+    nLoad();
+  } catch(e){ $('nErr').hidden = false; $('nErr').textContent = 'Envoi impossible : ' + (e.message || e); }
+  N.busy = false; $('nGo').disabled = false; $('nSure').disabled = false;
+}
+$('nForm').addEventListener('submit', e => { e.preventDefault();
+  if (nTo() === 'all') { $('nSure').hidden = false; $('nSure').focus(); return; } // envoi à tout le monde : deuxième clic
+  nSend(); });
+$('nSure').addEventListener('click', nSend);
+
 /* ---------- onglets ---------- */
 function setTab(t){
   S.tab = t;
-  $('over').hidden = t !== 'over'; $('ana').hidden = t !== 'ana'; $('poi').hidden = t !== 'poi';
+  $('over').hidden = t !== 'over'; $('ana').hidden = t !== 'ana'; $('poi').hidden = t !== 'poi'; $('ntf').hidden = t !== 'ntf';
   $('hOver').hidden = t !== 'over'; $('hAna').hidden = t !== 'ana';
   for (const a of document.querySelectorAll('.tabs a')) if (a.dataset.tab === t) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   if (t === 'ana' && S.me) renderAna();
   if (t === 'poi' && S.me) pRender();
+  if (t === 'ntf' && S.me && !N.busy) nLoad();
   if (t === 'over' && G.map) setTimeout(() => G.map.invalidateSize(), 30);
 }
-const hashTab = () => location.hash === '#analytics' ? 'ana' : location.hash === '#points' ? 'poi' : 'over';
+const hashTab = () => location.hash === '#analytics' ? 'ana' : location.hash === '#points' ? 'poi' : location.hash === '#notifications' ? 'ntf' : 'over';
 addEventListener('hashchange', () => setTab(hashTab()));
 document.querySelector('.tabs').addEventListener('click', e => { const a = e.target.closest('[data-tab]'); if (!a) return; e.preventDefault();
-  history.replaceState(null, '', a.dataset.tab === 'ana' ? '#analytics' : a.dataset.tab === 'poi' ? '#points' : location.pathname + location.search); setTab(a.dataset.tab); });
+  history.replaceState(null, '', a.dataset.tab === 'ana' ? '#analytics' : a.dataset.tab === 'poi' ? '#points' : a.dataset.tab === 'ntf' ? '#notifications' : location.pathname + location.search); setTab(a.dataset.tab); });
 
 async function init(){
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });

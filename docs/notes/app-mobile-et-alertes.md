@@ -32,7 +32,7 @@ Notes détaillées de Sillage, sorties de CLAUDE.md le 23/11/2026 (texte d'origi
 - Fonction `push-alerts` (v13) : actions `admin_reach` et `admin_send`, réservées aux admins actifs (`app_users.is_admin`). Envoi Web Push (`push_subs`) et FCM (`push_devices`) ; jetons morts supprimés. Lien forcé sur `https://app.sillage-ride.eu/` s'il pointe ailleurs.
 - Table `push_broadcasts` (historique, lecture admin par RLS) : `supabase/sql/2026-11-25_push_broadcasts.sql`.
 - Barre de 24 emojis sous le message : un clic insère l'emoji au curseur, dans le titre ou le message (dernier champ touché).
-- À reporter dans `sup-k7q2x9.html` quand Antoine valide.
+- Reporté dans `sup-k7q2x9.html` (prod) le 26/11/2026.
 - Comptes gratuits (25/11/2026, demande d'Antoine) : dans l'app, la carte Alertes météo montre aussi « Activer sur cet appareil » (jeton FCM enregistré, drapeau local `pmr-ntf`), pour recevoir les messages de la supervision ; les réglages d'alerte (`#alMore`) restent réservés à Sillage.cc +. Démo (invité) : rien.
 - Test d'envoi : fonction temporaire `push-hello` (en-tête `x-cron-token`, appelée par `net.http_post` depuis SQL) ; premier « hello world » reçu sur Android le 25/11/2026.
 - Android build 9 (25/11/2026) : petite icône de notification `res/drawable/ic_stat_sillage.xml` (silhouette blanche) et couleur `@color/sillage_notif` déclarées dans le manifeste (méta-données Firebase) ; app ouverte : `native.js` affiche un bandeau 6 s (`notificationReceived`, Android seulement — iPhone : bannière native).
