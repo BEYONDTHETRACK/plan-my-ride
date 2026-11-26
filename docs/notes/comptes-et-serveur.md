@@ -76,6 +76,7 @@ Notes détaillées de Sillage, sorties de CLAUDE.md le 23/11/2026 (texte d'origi
 - **Sillage.cc +** : `plan = 'full'` (testeurs, comptes d'avant le 30/10/2026, choix de l'admin), `plus_until` dans le futur (pass 10 jours 2,99 €, mensuel 4,99 €, annuel 34,99 € avec 7 jours d'essai : paiements pas encore branchés ; Apple = abonnement non renouvelable, Google = produit à achat unique, la date de fin est tenue par le serveur), ou admin. Tout sans limite.
 - `quota_om` reste à 3000 pour les comptes gratuits tant qu'index.html (en ligne) leur donne Open-Meteo.
 - Supervision (admin-test.html) : offre sous le nom du compte (« gratuit », « Sillage.cc + », « jusqu'au … ») et bouton « Passer en Sillage.cc + » / « Repasser en compte gratuit » (`plan`). Invités hors des comptes et du journal.
+- `purge_guests` (pg_cron `sillage-purge-guests`, 26/11/2026) : tous les comptes invités effacés chaque nuit à minuit heure de Paris (sauf venus dans le dernier quart d'heure).
 - `purge_old_data` : invités inactifs depuis 30 jours, `guest_ip` de plus de 2 jours, `trace_use` de plus de 13 mois.
 
 ## Adresse de la supervision (07/11/2026)
