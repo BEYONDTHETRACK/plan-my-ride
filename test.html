@@ -8164,7 +8164,7 @@ $('#pwForm').addEventListener('submit', async e => {
 if (/type=recovery/.test(location.hash)) sbClient().catch(() => {});
 $('#logoutLink').addEventListener('click', async e => {
   e.preventDefault();
-  try { const sb = await sbClient(); await sb.auth.signOut(); } catch (err) {}
+  try { const sb = await sbClient(); await sb.auth.signOut({ scope: 'local' }); } catch (err) {}
   try { localStorage.removeItem(SB_TOKEN_KEY); } catch (err) {}
   location.reload();
 });
@@ -8434,7 +8434,7 @@ $('#gateResend').addEventListener('click', async () => {
   } catch (e) { m.textContent = T("Envoi impossible, réessaie dans un moment."); }
   m.hidden = false; setTimeout(() => { b.disabled = false; }, 120000);
 });
-$('#gateOut').addEventListener('click', async () => { try { const sb = await sbClient(); await sb.auth.signOut(); } catch (e) {} try { localStorage.removeItem(SB_TOKEN_KEY); } catch (e) {} location.reload(); });
+$('#gateOut').addEventListener('click', async () => { try { const sb = await sbClient(); await sb.auth.signOut({ scope: 'local' }); } catch (e) {} try { localStorage.removeItem(SB_TOKEN_KEY); } catch (e) {} location.reload(); });
 /* ---------- mode démo (sans compte, 30/10/2026) ----------
    Compte invité créé par la fonction guest-start (identifiants dans pmr-guest, repris s'il en existe déjà un).
    Traces d'exemple seulement (DEMO, fichiers du dossier demo/), pas d'import, rien d'enregistré ; MET Norway sur 9 jours ;
@@ -9711,8 +9711,17 @@ function alKeyBytes(b64) { const t = b64.replace(/-/g, '+').replace(/_/g, '/'), 
 async function alReg() { return navigator.serviceWorker.register('sw.js', { scope: './' }); }
 async function alFn(action, extra) {
   const sb = await sbIfLogged(); if (!sb) throw new Error(T("connecte-toi d'abord."));
-  const { data, error } = await sb.functions.invoke('push-alerts', { body: { action, ...(extra || {}) } });
-  if (error) { let d = ''; try { const j = await error.context.json(); d = j.detail || j.error || ''; } catch (e) {} throw new Error(d || error.message); }
+  const call = () => sb.functions.invoke('push-alerts', { body: { action, ...(extra || {}) } });
+  let { data, error } = await call(), d = '';
+  if (error) { try { const j = await error.context.json(); d = j.detail || j.error || ''; } catch (e) {} }
+  // session fermée côté serveur (déconnexion sur un autre appareil, 26/11/2026) : nouveau jeton, sinon reconnexion demandée
+  if (error && d === 'auth') {
+    const r = await sb.auth.refreshSession().catch(() => ({ error: true }));
+    if (r.error || !r.data?.session) { try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {} throw new Error(T("ta session a expiré, reconnecte-toi.")); }
+    ({ data, error } = await call()); d = '';
+    if (error) { try { const j = await error.context.json(); d = j.detail || j.error || ''; } catch (e) {} if (d === 'auth') throw new Error(T("ta session a expiré, reconnecte-toi.")); }
+  }
+  if (error) throw new Error(d || error.message);
   return data;
 }
 function alMsg(t) { $('#alMsg').textContent = t || ''; }

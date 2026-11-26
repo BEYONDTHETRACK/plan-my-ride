@@ -886,6 +886,7 @@ window.PMR_I18N = {
     "chaud": "hot",
     "ciel, ": "sky,",
     "connecte-toi d'abord.": "log in first.",
+    "ta session a expiré, reconnecte-toi.": "your session has expired, please log in again.",
     "connecte-toi pour utiliser meteoblue.": "log in to use meteoblue.",
     "coucher ": "sunset",
     "dans ton compte : tu les retrouves aussi sur tes autres appareils.": "in your account: you'll also find them on your other devices.",
