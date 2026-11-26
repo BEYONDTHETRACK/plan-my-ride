@@ -973,6 +973,23 @@ body:not(.admin) .me-adm{display:none}
 .me-lv{font-size:15px;color:var(--muted);text-align:right}
 .me-chev{width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;transition:transform .15s}
 details[open]>summary .me-chev{transform:rotate(90deg)}
+.me-ntf .me-row2{gap:14px}.me-ntf-ic{width:36px;height:36px;border-radius:999px;background:var(--brand);color:var(--brand-ink);display:flex;align-items:center;justify-content:center;flex:none}.me-ntf-ic svg{width:20px;height:20px}
+.ntf-back{border:0;background:none;color:var(--ink);width:40px;height:40px;margin:0 2px 0 -8px;padding:0;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;cursor:pointer;border-radius:999px}.ntf-back svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ntf-intro{margin:14px 4px 0}
+.ntf-row{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:64px;box-sizing:border-box;cursor:pointer}.ntf-row+.ntf-row{border-top:1px solid var(--line)}
+.ntf-when{font-style:normal;font-family:var(--f-mono);font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.ntf-sw{appearance:none;-webkit-appearance:none;flex:none;width:52px;height:32px;border-radius:999px;background:var(--line);position:relative;margin:0;cursor:pointer;transition:background .15s}
+.ntf-sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:999px;background:var(--muted);transition:transform .15s,background .15s}
+.ntf-sw:checked{background:var(--brand)}.ntf-sw:checked::after{transform:translateX(20px);background:var(--brand-ink)}
+.ntf-sw:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+body.free .ntf-p{display:none}body.free .ntf-row:has(.ntf-p){cursor:default}body.free .ntf-row:has(.ntf-p) .me-lt b{color:var(--muted)}
+.ntf-lock{flex:none;border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-family:var(--f-mono);font-size:12px;color:var(--ink)}
+.ntf-taf{margin:0;padding:0 16px 12px}
+.ntf-next{padding:0 16px}.ntf-next .me-next{margin:0 0 12px}
+.ntf-al #alBox{padding:0 16px}.ntf-al .me-more{margin-top:0}
+.ntf-plus{margin-top:12px}
+body:not(.free) .free-only{display:none!important}
+#alOff{display:none!important}
 .me-gl{font-family:var(--f-mono);font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:24px auto 8px;padding-left:4px}
 .me-list{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 .me-list>*+*{border-top:1px solid color-mix(in srgb,var(--line) 60%,var(--panel))}
@@ -1925,27 +1942,9 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     <label class="al-l" for="meTaf">Aller · maison → travail</label><select id="meTaf" class="me-sel" aria-label="Trajet Commute : aller"></select>
     <span class="al-l me-ret">Retour · travail → maison</span>
     <div class="seg2 me-theme me-ret" id="meTafKind" role="group" aria-label="Trace du retour"><button type="button" data-k="rev" aria-pressed="true">À l'envers</button><button type="button" data-k="other" aria-pressed="false">Une autre trace</button></div>
-    <select id="meTafRet" class="me-sel me-ret" aria-label="Trajet Commute : trace du retour" hidden></select></div>
-  <div class="me-card" id="alCard"><h3>Alertes météo</h3>
-    <p class="hint">La météo de ton parcours à ton heure de départ, la veille au soir ou le matin même.</p><div class="me-next" id="alNext" hidden><span>Prochaine alerte</span><b id="alNextTxt"></b></div>
-    <p class="al-why no-lim" id="alWhy" hidden></p>
-    <div id="alBox" class="no-lim">
-      <div class="me-btns al-dev"><button type="button" class="btn small primary" id="alOn">Activer sur cet appareil</button><span class="al-state" id="alState"></span></div>
-      <details class="me-more" id="alMore"><summary><span class="me-lt"><b>Régler les alertes</b><span>Parcours, heure, la veille ou le matin, jours</span></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
-      <span class="al-l">Dossier</span>
-      <div class="me-mseg al-kind" id="alKind" role="group" aria-label="Dossier des parcours"></div>
-      <label class="al-l" for="alRoute">Parcours</label>
-      <select id="alRoute" class="me-sel"></select>
-      <div class="al-grid">
-        <div><label class="al-l" for="alTime">Départ</label><input type="time" id="alTime" step="900" class="me-sel"></div>
-        <div><label class="al-l" for="alWhen">Prévenir</label><select id="alWhen" class="me-sel"><option value="eve">La veille, 20 h</option><option value="morn">Le matin, 7 h</option></select></div>
-      </div>
-      <span class="al-l">Jours de sortie</span>
-      <div class="al-days" id="alDays" role="group" aria-label="Jours de sortie"></div><div class="al-legend"><span class="on">✓ Alerte activée</span><span class="no">✕ Pas d'alerte</span></div>
-      <div class="me-btns"><button type="button" class="btn small" id="alTest">Envoyer l'alerte maintenant</button><button type="button" class="btn small" id="alOff">Couper les alertes</button></div>
-      </details>
-      <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
-    </div></div>
+    <select id="meTafRet" class="me-sel me-ret" aria-label="Trajet Commute : trace du retour" hidden></select>
+    <p class="hint me-ret">Sa météo en notification : Moi → Notifications.</p></div>
+  <div class="me-list no-guest me-ntf"><button type="button" class="me-row2" id="meNtf"><span class="me-ntf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></span><span class="me-lt"><b>Notifications</b><span id="meNtfSub"></span></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
   <div class="me-card no-guest" id="meOcCard"><h3>Cartes de mes traces, hors ligne</h3>
     <p class="hint">Le fond de carte, le relief et les points utiles à 15 km de chaque trace gardée, de plus en plus détaillés près du tracé. Tu les gardes depuis la carte d'une sortie ou depuis Mes parcours.</p>
     <p class="hint" id="meOcSum"></p>
@@ -1976,6 +1975,51 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
     <button type="button" class="me-row2 no-guest" id="meOut"><span class="me-lt"><b class="me-out">Se déconnecter</b></span></button>
   </div>
   <p class="me-del2 no-guest"><button type="button" class="linkbtn" id="meDel">Supprimer mon compte</button></p>
+</section>
+<section class="libpage me2" id="ntfPage" hidden aria-labelledby="ntfTitle">
+  <div class="lp-head"><h2 id="ntfTitle"><button type="button" class="ntf-back" id="ntfBack" aria-label="Retour à Moi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>Notifications</h2><button type="button" class="btn small pg-x">Fermer</button></div>
+  <div class="me-card" id="alCard">
+    <p class="al-why" id="alWhy" hidden></p>
+    <div class="me-btns al-dev"><button type="button" class="btn small primary" id="alOn">Activer sur cet appareil</button><span class="al-state" id="alState"></span></div>
+    <p class="hint al-msg" id="alMsg" aria-live="polite"></p>
+  </div>
+  <div class="guest-lock free-only ntf-plus"><b>Choisis ta météo, avec Sillage.cc +</b><p>La veille de ta sortie, avant ton trajet, ou sur le parcours que tu surveilles : la météo arrive toute seule sur ton téléphone.</p><button type="button" class="btn small primary" data-plus>Découvrir Sillage.cc +</button></div>
+  <p class="hint ntf-intro">Choisis ce que Sillage t'envoie. Tes choix valent pour ton compte, sur tous tes appareils.</p>
+  <p class="me-gl">Mes sorties</p>
+  <div class="me-list">
+    <label class="ntf-row"><span class="me-lt"><b>Ma sortie programmée</b><span>La météo de la trace dont tu as réglé le jour et l'heure.</span><i class="ntf-when">La veille · 19 h</i></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="ride" role="switch"></label>
+  </div>
+  <p class="me-gl">Commute</p>
+  <div class="me-list">
+    <label class="ntf-row"><span class="me-lt"><b>La veille au soir</b><span>La météo de l'aller, pour préparer tes affaires.</span><i class="ntf-when">Veille · 20 h 30</i></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="taf_eve" role="switch"></label>
+    <label class="ntf-row"><span class="me-lt"><b>Avant de partir</b><span>La météo de l'aller, remise à jour.</span><i class="ntf-when">45 min avant le départ</i></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="taf_morn" role="switch"></label>
+    <label class="ntf-row"><span class="me-lt"><b>Avant le retour</b><span>La météo du retour, avant de quitter le travail.</span><i class="ntf-when">2 h avant le retour</i></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="taf_aft" role="switch"></label>
+    <p class="hint ntf-taf" id="ntfTaf"></p>
+  </div>
+  <p class="me-gl">Alerte d'un parcours</p>
+  <div class="me-list ntf-al">
+    <label class="ntf-row"><span class="me-lt"><b>Un parcours à surveiller</b><span id="ntfAlSub"></span></span><span class="ntf-lock free-only">Sillage.cc +</span><input type="checkbox" class="ntf-sw ntf-p" data-k="alert" role="switch"></label>
+    <div class="ntf-next"><div class="me-next" id="alNext" hidden><span>Prochaine alerte</span><b id="alNextTxt"></b></div></div>
+    <div id="alBox" class="no-guest">
+      <details class="me-more no-lim" id="alMore"><summary><span class="me-lt"><b>Régler les alertes</b><span>Parcours, heure, la veille ou le matin, jours</span></span><svg class="me-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <span class="al-l">Dossier</span>
+      <div class="me-mseg al-kind" id="alKind" role="group" aria-label="Dossier des parcours"></div>
+      <label class="al-l" for="alRoute">Parcours</label>
+      <select id="alRoute" class="me-sel"></select>
+      <div class="al-grid">
+        <div><label class="al-l" for="alTime">Départ</label><input type="time" id="alTime" step="900" class="me-sel"></div>
+        <div><label class="al-l" for="alWhen">Prévenir</label><select id="alWhen" class="me-sel"><option value="eve">La veille, 20 h</option><option value="morn">Le matin, 7 h</option></select></div>
+      </div>
+      <span class="al-l">Jours de sortie</span>
+      <div class="al-days" id="alDays" role="group" aria-label="Jours de sortie"></div><div class="al-legend"><span class="on">✓ Alerte activée</span><span class="no">✕ Pas d'alerte</span></div>
+      <div class="me-btns"><button type="button" class="btn small" id="alTest">Envoyer l'alerte maintenant</button><button type="button" class="btn small" id="alOff">Couper les alertes</button></div>
+      </details>
+    </div>
+  </div>
+  <p class="me-gl">Sillage</p>
+  <div class="me-list">
+    <label class="ntf-row"><span class="me-lt"><b>Nouveautés et conseils</b><span>Les nouveautés de l'app et les messages de l'équipe.</span><i class="ntf-when">Quand il y a du nouveau</i></span><input type="checkbox" class="ntf-sw" data-k="news" role="switch"></label>
+  </div>
 </section>
 <section class="libpage help2" id="helpPage" hidden aria-labelledby="hpTitle">
   <div class="lp-head"><h2 id="hpTitle">Aide</h2><button type="button" class="btn small pg-x">Fermer</button></div>
@@ -2458,6 +2502,7 @@ body:is([data-mode="ride"],[data-mode="ultra"]) .chart-keys .ck-v1,body:not([dat
 (() => {
 // Page de test (test.html) : même code que index.html ; bandeau, titre, pas de mesure d'audience.
 const IS_TEST = /\/test\.html$/.test(location.pathname);
+const GUEST = false, FREE = false, LIM = false; // index.html : ni mode démo ni compte gratuit (offres en test seulement) ; lus par le code des notifications
 if (IS_TEST) { document.getElementById('testBand').hidden = false; document.title = '🧪 ' + document.title; }
 'use strict';
 /* ---------- langue (depuis le 25/10/2026) ----------
@@ -2544,12 +2589,20 @@ if (UNITS.mi) {
 /* ---------- état ---------- */
 // pages : Sortie (#), Ultra (#ultra), Vélotaf (#velotaf)
 function hashMode(hs) { return hs === '#ultra' ? 'ultra' : hs === '#velotaf' ? 'taf' : 'ride'; }
+// Liens des notifications Commute (26/11/2026) : ?open=taf ouvre la page Commute, ?open=plus l'offre Sillage.cc +.
+(() => { try {
+  const q = new URLSearchParams(location.search), o = q.get('open'); if (!o) return;
+  q.delete('open');
+  if (o === 'plus') sessionStorage.setItem('pmr-open-plus', '1');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + (o === 'taf' ? '#velotaf' : location.hash));
+} catch (e) {} })();
 // Lien d'une alerte météo (?route=ID&date=AAAA-MM-JJ&time=HH:MM) : ce parcours en page Sortie, à ce jour et cette heure.
 (() => { try {
   const q = new URLSearchParams(location.search), r = q.get('route'); if (!r) return;
   localStorage.setItem('pmr-last-route', r);
   const d = q.get('date') || '', t = q.get('time') || '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) sessionStorage.setItem('pmr-ride-date', d);
+  window.PMR_ALERT_LINK = true;
   if (/^\d{2}:\d{2}$/.test(t)) sessionStorage.setItem('pmr-ride-time', t);
   for (const k of ['route', 'date', 'time']) q.delete(k);
   history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
@@ -5937,7 +5990,7 @@ const MODE_DEF = {
   taf: { time: '07:45', speed: 20, vam: 0, pause: 0, pauseMode: 'pct', pauseMin: 0, pauseEvery: 1, windOn: false, poiRadius: 500, tafBack: '17:30', tafRet: '' },
   ultra: { time: '07:00', speed: 22, vam: 0, pause: 0, pauseMode: 'min', pauseMin: 0, pauseEvery: 1, windOn: false, poiRadius: 500, planDays: 3, planSplit: 'km', planCustom: false, planTimes: [], planEnds: [] }
 };
-function saveOpt(o) { try { localStorage.setItem(optKey(), JSON.stringify({ ...o, date: S.mode === 'ultra' ? o.date : undefined })); } catch (e) {} }
+function saveOpt(o) { try { localStorage.setItem(optKey(), JSON.stringify({ ...o, date: S.mode === 'ultra' ? o.date : undefined })); } catch (e) {} if (S.mode === 'taf' && typeof tafSync === 'function') tafSync(); }
 function initInputs() {
   const tm = new Date(); tm.setDate(tm.getDate() + 1);
   let saved = {}; try { saved = JSON.parse(localStorage.getItem(optKey()) || '{}') || {}; } catch (e) {}
@@ -7425,7 +7478,7 @@ $('#tafTrips').addEventListener('click', async e => {
 $('#tafTrips').addEventListener('change', e => {
   if (e.target.id !== 'ttDef') return; const on = e.target.checked;
   try { if (on && LIB.current) { localStorage.setItem('pmr-taf-route', LIB.current); if (TAF.ret) localStorage.setItem('pmr-taf-ret', TAF.ret); else localStorage.removeItem('pmr-taf-ret'); } else { localStorage.removeItem('pmr-taf-route'); localStorage.removeItem('pmr-taf-ret'); } } catch (err) {}
-  meTafSel(); tripsRender();
+  meTafSel(); tripsRender(); tafSync();
 });
 $('#ttList').addEventListener('click', async e => {
   const b = e.target.closest('[data-pick]'); if (!b) return; const id = b.dataset.pick; $('#ttDlg').close();
@@ -8278,7 +8331,9 @@ async function libOpen(id) {
   }
   if (!rec) { setStatus(T("Ce parcours n'est plus disponible."), 'err'); return; }
   LIB.current = id; try { if (S.mode !== 'taf') localStorage.setItem('pmr-last-route', id); } catch (e) {} // les trajets Commute ne remplacent pas le dernier parcours des autres pages
+  rwApply(id);
   try { loadRoute(unpackPts(rec.pts), m.name, revGet(id)); } catch (e) { setStatus(e.message, 'err'); return; }
+  window.PMR_ALERT_LINK = false;
   const now = new Date().toISOString(); libUpsert({ id, used_at: now }); libRender();
   try { await idbRun('meta', 'readwrite', st => st.put({ id, name: m.name, km: m.km, dplus: m.dplus, used_at: now, kind: m.kind || null })); } catch (e) {}
   const sb = await sbIfLogged(); if (sb && m.remote) sb.from('routes').update({ used_at: now }).eq('user_id', SB_UID).eq('id', id).then(() => {});
@@ -8352,7 +8407,41 @@ function sheetOpen(sel) {
 }
 $('#settings').addEventListener('scroll', e => { if (e.currentTarget.scrollLeft) e.currentTarget.scrollLeft = 0; }, { passive: true });
 function sheetClose() { document.body.classList.remove('sheet-open'); }
-$('#sheetOk').addEventListener('click', sheetClose);
+/* Jour et heure gardés avec chaque trace (26/11/2026, demande d'Antoine) : « OK » des réglages enregistre la date et l'heure
+   de départ de la trace ouverte (pmr-route-when, sur ce téléphone ou ce navigateur) ; en rouvrant la trace, on retrouve
+   la même heure, et le même jour s'il n'est pas passé (sinon aujourd'hui). Pages Sortie et Ultra ; Commute a ses propres heures. */
+const RW_KEY = 'pmr-route-when';
+const rwAll = () => { try { return JSON.parse(localStorage.getItem(RW_KEY) || '{}') || {}; } catch (e) { return {}; } };
+function rwSave() {
+  if (!LIB.current || S.mode === 'taf') return;
+  const d = $('#date').value, t = $('#time').value; if (!/^\d{2}:\d{2}$/.test(t)) return;
+  const all = rwAll(); all[LIB.current] = { date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '', time: t, at: Date.now() };
+  const ids = Object.keys(all).sort((a, b) => all[b].at - all[a].at); for (const k of ids.slice(200)) delete all[k]; // 200 traces au plus
+  try { localStorage.setItem(RW_KEY, JSON.stringify(all)); } catch (e) {}
+  rwSync(LIB.current, all[LIB.current]);
+}
+// Page Sortie : la sortie programmée part aussi dans le compte (ride_plans) → la veille à 19 h, « Météo sur ta trace … »
+// (Sillage.cc +) ou une invitation (compte gratuit). Fonction ride-plans. Parcours du compte seulement.
+async function rwSync(id, w) {
+  if (S.mode !== 'ride' || GUEST || !w || !w.date || w.date < ymd(new Date()) || !hasSbToken()) return;
+  const m = LIB.list.find(x => x.id === id); if (!m || !m.remote) return;
+  try {
+    const sb = await sbIfLogged(); if (!sb || !SB_UID) return;
+    const o = readOpt();
+    await sb.from('ride_plans').upsert({ user_id: SB_UID, route_id: id, date: w.date, time: w.time, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Paris',
+      lang: LANG, dist: UNITS.mi ? 'mi' : 'km', temp: UNITS.f ? 'f' : 'c', page: location.origin + location.pathname,
+      speed: +o.speed || null, vam: +o.vam || null, notified_at: null, updated_at: new Date().toISOString() }, { onConflict: 'user_id,route_id' });
+  } catch (e) {}
+}
+function rwApply(id) { // avant le calcul : remet la date et l'heure gardées pour cette trace
+  if (S.mode === 'taf' || window.PMR_ALERT_LINK) return false;
+  const w = rwAll()[id]; if (!w || !/^\d{2}:\d{2}$/.test(w.time)) return false;
+  const today = ymd(new Date());
+  $('#date').value = w.date && w.date >= today ? w.date : today; $('#time').value = w.time;
+  return true;
+}
+$('#sheetOk').addEventListener('click', () => { rwSave(); sheetClose(); });
+for (const k of ['#date', '#time']) $(k).addEventListener('change', rwSave); // grand écran : pas de bouton OK, chaque changement compte
 $('#sheetBg').addEventListener('click', sheetClose);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('sheet-open')) sheetClose(); });
 $('#tabLib').addEventListener('click', lpOpen);
@@ -8415,7 +8504,7 @@ async function lpRename(id, name) {
 }
 $('#lpAll').addEventListener('click', lpOpen);
 // Pages plein écran (Mes parcours, Mes sorties, Moi) : une seule ouverte à la fois, onglet du bas allumé.
-const PAGES = ['libPage', 'outPage', 'mePage', 'mapPage', 'helpPage'];
+const PAGES = ['libPage', 'outPage', 'mePage', 'mapPage', 'helpPage', 'ntfPage'];
 function pageOpen(pid, tabSel) {
   sheetClose();
   for (const q of PAGES) { const el = document.getElementById(q); if (el) el.hidden = q !== pid; }
@@ -8850,7 +8939,7 @@ function meRender() {
   $('#meVMotion').textContent = seg('meMotion'); $('#meVFont').textContent = seg('meFont').replace(/\s*\(.*\)/, '');
   meTafSel();
 }
-function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); }
+function meOpen() { pageOpen('mePage', '#tabMe'); ME.mode = S.mode; meRender(); alRender(); alLoad(); offRender(); ocMeRender(); ntfLoad(); tafSync(); }
 const ME_STEP = { speed: [12, 40, 0.5], vam: [0, 1400, 50], pmin: [0, 30, 1] };
 function meModesRender() {
   const m = ME.mode, g = meGet(m), fmt = { speed: v => fV(+v, 1) + ' ' + UL.kmh, vam: v => +v > 0 ? fE(+v) + ' ' + UL.mh : T("désactivée"), pmin: v => v + ' min' };
@@ -8947,9 +9036,77 @@ function meTafSel() {
 function meTafSave() {
   const go = $('#meTaf').value, ret = go && ME.tafOther ? $('#meTafRet').value : '';
   try { if (go) localStorage.setItem('pmr-taf-route', go); else localStorage.removeItem('pmr-taf-route'); if (go && ret && ret !== go) localStorage.setItem('pmr-taf-ret', ret); else localStorage.removeItem('pmr-taf-ret'); } catch (e) {}
-  meTafSel();
+  meTafSel(); tafSync();
   if (S.mode === 'taf') { if (go) tafOpenDefault(); else tripsRender(); }
 }
+/* Alertes Commute (26/11/2026) : le trajet fixé ici, les heures et réglages de la page Commute (pmr-opt-taf) sont recopiés
+   dans le compte (table commute_alerts) ; la fonction commute-alerts envoie la météo la veille à 20 h 30 (aller)
+   et 2 h avant le retour. Case « Météo du trajet en notification » : pmr-taf-al ('0' = coupé). Démo : rien. */
+const tafAlOn = () => { try { return localStorage.getItem('pmr-taf-al') !== '0'; } catch (e) { return true; } };
+let tafSyncT = 0;
+function tafSync() { clearTimeout(tafSyncT); tafSyncT = setTimeout(tafSyncNow, 1500); }
+async function tafSyncNow() {
+  if (GUEST || !hasSbToken()) return;
+  try {
+    const sb = await sbIfLogged(); if (!sb || !SB_UID) return;
+    const fx = tafFixed(), go = fx && LIB.list.find(x => x.id === fx.go && x.remote), ret = fx && fx.ret && LIB.list.find(x => x.id === fx.ret && x.remote);
+    if (!go) { await sb.from('commute_alerts').update({ enabled: false, updated_at: new Date().toISOString() }).eq('user_id', SB_UID); return; }
+    let o = {}; try { o = JSON.parse(localStorage.getItem('pmr-opt-taf') || '{}') || {}; } catch (e) {}
+    o = { ...MODE_DEF.taf, ...o };
+    const row = { user_id: SB_UID, enabled: tafAlOn(), route_go: go.id, route_ret: ret ? ret.id : null, go_time: o.time || '07:45', go_mode: o.tafGoMode === 'arr' ? 'arr' : 'dep',
+      margin: Math.round(+o.tafMargin || 0), back_time: o.tafBack || '17:30', per_day: !!o.tafPerDay, days: o.tafDays && typeof o.tafDays === 'object' ? o.tafDays : null,
+      speed: +o.speed || null, vam: +o.vam || null, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Paris', lang: LANG,
+      dist: UNITS.mi ? 'mi' : 'km', temp: UNITS.f ? 'f' : 'c', page: location.origin + location.pathname, updated_at: new Date().toISOString() };
+    await sb.from('commute_alerts').upsert(row, { onConflict: 'user_id' });
+  } catch (e) {}
+}
+setTimeout(() => { if (!GUEST) tafSync(); }, 10000); // à l'ouverture de l'app : le compte suit les réglages de ce téléphone
+/* ---------- menu Notifications (27/11/2026, maquette « Sillage · Menu Notifications ») ----------
+   Moi → Notifications (#ntfPage) : l'appareil (#alCard : activer, état), puis ce que le compte veut recevoir, gardé dans
+   notif_prefs (pas de ligne = tout activé) : ride (sortie programmée, ride-plans), taf_eve / taf_morn / taf_aft (commute-alerts),
+   news (messages « tout le monde » de la supervision). L'alerte d'un parcours reste push_alerts.enabled (alSave).
+   Compte gratuit : seules les nouveautés se règlent ; le reste porte « Sillage.cc + ». */
+var NTF = { p: { ride: true, taf_eve: true, taf_morn: true, taf_aft: true, news: true }, uid: '' };
+function NTF_N() { return ['ride', 'taf_eve', 'taf_morn', 'taf_aft', 'news'].filter(k => NTF.p[k]).length + (AL.row && AL.row.enabled ? 1 : 0); }
+function ntfRender() {
+  if (!NTF || !$('#ntfPage')) return;
+  const dev = !!($('#alState') && $('#alState').textContent), alOn = !!(AL.row && AL.row.enabled), r = AL.row || {};
+  for (const i of document.querySelectorAll('#ntfPage .ntf-sw[data-k]')) {
+    const k = i.dataset.k; i.checked = k === 'alert' ? alOn : !!NTF.p[k];
+    i.disabled = !!(LIM && k !== 'news'); i.setAttribute('aria-checked', String(i.checked));
+  }
+  let tafName = ''; try { const id = localStorage.getItem('pmr-taf-route') || ''; const x = LIB.list.find(y => y.id === id); tafName = x ? x.name : ''; } catch (e) {}
+  if ($('#ntfTaf')) $('#ntfTaf').textContent = FREE ? T("Pendant l'essai Commute de 5 jours, la météo de ton trajet arrive quand même.")
+    : tafName ? T("Ton trajet : {0}", [tafName]) : T("Choisis ton trajet dans Moi → Mon trajet Commute.");
+  if ($('#ntfAlSub')) $('#ntfAlSub').textContent = FREE ? T("La veille ou le matin même, les jours choisis.")
+    : r.route_name ? T("{0} · départ {1} · {2}", [r.route_name, r.dep_time || '09:00', r.notify === 'morn' ? T("le matin à 7 h") : T("la veille à 20 h")]) : T("Choisis un parcours dans « Régler les alertes ».");
+  if ($('#meNtfSub')) $('#meNtfSub').textContent = (FREE ? (NTF.p.news ? T("Nouvelles de Sillage") : T("Aucune")) : T("{0} sur 6 actives", [NTF_N()]))
+    + ' · ' + (dev ? T("ce téléphone ✓") : T("à activer sur cet appareil"));
+}
+async function ntfLoad() {
+  ntfRender();
+  try { const sb = await sbIfLogged(); if (!sb || GUEST) return;
+    const { data } = await sb.from('notif_prefs').select('ride,taf_eve,taf_morn,taf_aft,news').eq('user_id', SB_UID).maybeSingle();
+    if (data) Object.assign(NTF.p, data); NTF.uid = SB_UID; ntfRender(); } catch (e) {}
+}
+async function ntfSave(k, v) {
+  NTF.p[k] = v; ntfRender();
+  if (k.startsWith('taf_')) { try { localStorage.setItem('pmr-taf-al', NTF.p.taf_eve || NTF.p.taf_morn || NTF.p.taf_aft ? '1' : '0'); } catch (e) {} tafSync(); }
+  try { const sb = await sbIfLogged(); if (!sb) return;
+    const { error } = await sb.from('notif_prefs').upsert({ user_id: SB_UID, ...NTF.p, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) alMsg(T("Réglages non enregistrés : {0}", [error.message])); } catch (e) {}
+}
+function ntfOpen() { pageOpen('ntfPage', '#tabMe'); alRender(); alLoad(); ntfLoad(); }
+$('#meNtf').addEventListener('click', ntfOpen);
+$('#ntfBack').addEventListener('click', meOpen);
+$('#ntfPage').addEventListener('change', async e => {
+  const i = e.target.closest && e.target.closest('.ntf-sw[data-k]'); if (!i) return;
+  const k = i.dataset.k, v = i.checked;
+  if (k !== 'alert') { ntfSave(k, v); return; }
+  alMsg('');
+  if (await alSave({ enabled: v })) alMsg(v ? T("Alerte activée : choisis le parcours, l'heure et les jours dans « Régler les alertes ».") : T("Alerte coupée. Tes réglages sont gardés."));
+  alRender(); ntfRender();
+});
 $('#meTaf').addEventListener('change', () => { ME.tafOther = false; meTafSave(); });
 $('#meTafRet').addEventListener('change', meTafSave);
 $('#meTafKind').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (!b) return; ME.tafOther = b.dataset.k === 'other'; meTafSave(); if (ME.tafOther) $('#meTafRet').focus(); });
@@ -9012,10 +9169,13 @@ $('#delForm').addEventListener('submit', async e => {
 /* Alertes météo (essai du 25/10/2026) : notifications Web Push. Le service worker sw.js affiche les notifications ;
    la fonction edge push-alerts garde les abonnements (push_subs) et envoie chaque soir à 20 h (ou matin à 7 h)
    l'alerte du parcours choisi (réglages dans push_alerts, une ligne par compte, écrite ici). */
-const AL = { row: null, sub: null, loaded: false };
+const AL = { row: null, sub: null, tok: null, loaded: false };
 const AL_DAYS = [0, 1, 2, 3, 4, 5, 6].map(i => new Intl.DateTimeFormat(LOC, { weekday: 'narrow' }).format(new Date(2024, 0, 1 + i)).toUpperCase());
 const AL_DAYN = [0, 1, 2, 3, 4, 5, 6].map(i => new Intl.DateTimeFormat(LOC, { weekday: 'long' }).format(new Date(2024, 0, 1 + i)));
-const alCan = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+// App iPhone / Android (25/11/2026) : notifications natives par Firebase (plugin FirebaseMessaging) ; le jeton de l'appareil va dans push_devices.
+const alNat = () => !!(window.SILLAGE_NATIVE && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseMessaging);
+const alFM = () => window.Capacitor.Plugins.FirebaseMessaging;
+const alCan = () => alNat() || ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
 const alIos = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const alStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 function alKeyBytes(b64) { const t = b64.replace(/-/g, '+').replace(/_/g, '/'), p = t + '='.repeat((4 - t.length % 4) % 4); return Uint8Array.from(atob(p), c => c.charCodeAt(0)); }
@@ -9036,10 +9196,19 @@ async function alFn(action, extra) {
   return data;
 }
 function alMsg(t) { $('#alMsg').textContent = t || ''; }
+// Compte gratuit (25/11/2026) : pas d'alertes météo, mais l'appareil peut recevoir les messages de Sillage (supervision).
+const alNtf = (v) => { try { if (v === undefined) return localStorage.getItem('pmr-ntf') === '1'; if (v) localStorage.setItem('pmr-ntf', '1'); else localStorage.removeItem('pmr-ntf'); } catch (e) { return false; } };
 async function alLoad() {
   if (AL.loaded) return; AL.loaded = true;
   try { const sb = await sbIfLogged(); if (sb) { const { data } = await sb.from('push_alerts').select('*').maybeSingle(); AL.row = data || null; } } catch (e) {}
-  try { if (alCan()) { const r = await navigator.serviceWorker.getRegistration('./'); AL.sub = r ? await r.pushManager.getSubscription() : null; } } catch (e) {}
+  if (alNat()) {
+    try {
+      AL.perm = (await alFM().checkPermissions()).receive;
+      if (AL.perm === 'granted' && ((AL.row && AL.row.enabled) || (FREE && alNtf()))) { // jeton rafraîchi à chaque ouverture (il peut changer)
+        const { token } = await alFM().getToken(); await alFn('device_register', { token, platform: window.SILLAGE_NATIVE }); AL.tok = token;
+      }
+    } catch (e) {}
+  } else try { if (alCan()) { const r = await navigator.serviceWorker.getRegistration('./'); AL.sub = r ? await r.pushManager.getSubscription() : null; } } catch (e) {}
   alRender();
 }
 function alDefaults() {
@@ -9049,17 +9218,17 @@ function alDefaults() {
 }
 function alRender() {
   if (!$('#alCard')) return;
-  const why = $('#alWhy'), r = AL.row || alDefaults(), on = !!(AL.row && AL.row.enabled), dev = !!AL.sub && typeof Notification !== 'undefined' && (AL.perm === 'granted' || Notification.permission === 'granted');
+  const why = $('#alWhy'), r = AL.row || alDefaults(), on = !!(AL.row && AL.row.enabled), dev = alNat() ? !!AL.tok && AL.perm === 'granted' : !!AL.sub && typeof Notification !== 'undefined' && (AL.perm === 'granted' || Notification.permission === 'granted');
   if (!alCan()) {
     why.hidden = false;
     why.innerHTML = alIos() && !alStandalone()
       ? T("Sur iPhone, les alertes passent par l'app installée : touche <b>Partager</b> puis <b>Sur l'écran d'accueil</b>, ouvre Sillage depuis cette icône, puis reviens ici (iOS 16.4 ou plus).")
       : T("Ce navigateur ne reçoit pas les notifications. Essaie avec Chrome, Edge, Firefox ou Safari à jour.");
-  } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied' && AL.perm !== 'granted') {
+  } else if (alNat() ? AL.perm === 'denied' : (typeof Notification !== 'undefined' && Notification.permission === 'denied' && AL.perm !== 'granted')) {
     why.hidden = false; why.textContent = T("Les notifications sont bloquées pour Sillage : autorise-les dans les réglages du navigateur (ou de l'app), puis reviens ici.");
   } else why.hidden = true;
   $('#alOn').hidden = !alCan() || dev;
-  $('#alState').textContent = dev ? (on ? T("✓ Alertes actives sur cet appareil") : T("✓ Cet appareil peut recevoir les alertes")) : '';
+  $('#alState').textContent = dev ? (FREE ? T("✓ Notifications actives sur cet appareil") : on ? T("✓ Alertes actives sur cet appareil") : T("✓ Cet appareil peut recevoir les alertes")) : '';
   $('#alState').classList.toggle('on', dev && on);
   // Dossier choisi d'abord (12/11/2026, demande d'Antoine) : Sortie / Commute / Ultra, puis seulement ses parcours.
   const all = LIB.list.filter(x => x.remote).sort((a, b) => a.name.localeCompare(b.name, LANG));
@@ -9087,6 +9256,7 @@ function alRender() {
     const when = dd === 0 ? T("Aujourd'hui") : dd === 1 ? T("Demain") : dayFmt.format(nx);
     $('#alNextTxt').textContent = T("{0} {1} h · {2}, départ {3}", [when, nx.getHours(), r.route_name || ($('#alRoute').selectedOptions[0] || {}).text || T("Parcours"), r.dep_time || '09:00']); }
   if ($('#meKAl')) { $('#meKAl').textContent = on ? 'ON' : 'OFF'; $('#meKAl').classList.toggle('on', on); }
+  if (typeof ntfRender === 'function') ntfRender();
 }
 async function alSave(patch) {
   const sb = await sbIfLogged(); if (!sb) { alMsg(T("Connecte-toi pour régler les alertes.")); return false; }
@@ -9103,6 +9273,16 @@ async function alSave(patch) {
 $('#alOn').addEventListener('click', async () => {
   const b = $('#alOn'); b.disabled = true; alMsg('');
   try {
+    if (alNat()) {
+      AL.perm = (await alFM().requestPermissions()).receive;
+      if (AL.perm !== 'granted') { alRender(); alMsg(T("Notifications refusées : rien ne sera envoyé.")); return; }
+      const { token } = await alFM().getToken();
+      await alFn('device_register', { token, platform: window.SILLAGE_NATIVE });
+      AL.tok = token;
+      if (FREE) { alNtf(true); alMsg(T("Notifications activées : tu recevras les nouvelles de Sillage sur cet appareil.")); return; }
+      if (await alSave({ enabled: true })) alMsg(T("C'est prêt : tu recevras la météo de « {0} » {1}. « Envoyer l'alerte maintenant » pour voir à quoi elle ressemble.", [AL.row.route_name || T("ton parcours"), AL.row.notify === 'morn' ? T("le matin à 7 h") : T("la veille à 20 h")]));
+      return;
+    }
     AL.perm = await Notification.requestPermission();
     if (AL.perm !== 'granted') { alRender(); alMsg(T("Notifications refusées : rien ne sera envoyé.")); return; }
     const reg = await alReg(); await navigator.serviceWorker.ready;
@@ -9135,12 +9315,13 @@ $('#alTest').addEventListener('click', async () => {
 });
 $('#alOff').addEventListener('click', async () => {
   alMsg('');
-  try { if (AL.sub) { await alFn('unsubscribe', { endpoint: AL.sub.endpoint }).catch(() => {}); await AL.sub.unsubscribe().catch(() => {}); AL.sub = null; }
+  try { if (AL.tok) { await alFn('device_unregister', { token: AL.tok }).catch(() => {}); AL.tok = null; }
+    if (AL.sub) { await alFn('unsubscribe', { endpoint: AL.sub.endpoint }).catch(() => {}); await AL.sub.unsubscribe().catch(() => {}); AL.sub = null; }
     if (await alSave({ enabled: false })) alMsg(T("Alertes coupées. Tes réglages sont gardés.")); }
   finally { alRender(); }
 });
 // déjà abonné : le service worker reste enregistré (une mise à jour de sw.js est prise au chargement)
-try { if (alCan() && hasSbToken()) navigator.serviceWorker.getRegistration('./').then(r => { if (r) r.update().catch(() => {}); }).catch(() => {}); } catch (e) {}
+try { if (!alNat() && alCan() && hasSbToken()) navigator.serviceWorker.getRegistration('./').then(r => { if (r) r.update().catch(() => {}); }).catch(() => {}); } catch (e) {}
 
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (!document.documentElement.dataset.theme) redrawTheme(); });
 
