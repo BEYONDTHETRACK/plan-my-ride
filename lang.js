@@ -691,6 +691,10 @@ window.PMR_I18N = {
     "Thème clair": "Light theme",
     "Thème sombre": "Dark theme",
     "Toi à l'heure choisie": "You at the chosen time",
+    /* vent animé : lecture ▶ et légende (26/11/2026) */
+    "Faire défiler le vent de ton départ à ton arrivée": "Play the wind from your start to your finish",
+    "Mettre en pause le défilement du vent": "Pause the wind playback",
+    "<div class=\"wrow\"><span>Vent animé : vent à l'heure du curseur, partout sur la carte · flèches : vent à ton heure de passage à cet endroit</span></div>": "<div class=\"wrow\"><span>Animated wind: wind at the slider time, across the whole map · arrows: wind when you pass that spot</span></div>",
     "Ton compte est suspendu. Contacte l'administrateur.": "Your account is suspended. Contact the administrator.",
     "Ton compte n'a pas encore accès à Plan My Ride. L'administrateur peut l'ouvrir depuis sa page Admin.": "Your account doesn't have access to Plan My Ride yet. The administrator can open it from their Admin page.",
     "Ton compte n'a pas encore accès à Sillage. L'administrateur peut l'ouvrir depuis sa page Admin.": "Your account doesn't have access to Sillage yet. The administrator can open it from their Admin page.",
