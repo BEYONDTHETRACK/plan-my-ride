@@ -56,3 +56,5 @@ Notes détaillées de Sillage, sorties de CLAUDE.md le 23/11/2026 (texte d'origi
 
 
 - Arrêts, VAM et vent désactivés par défaut (24/11/2026, test.html) : `MODE_DEF` met `pause: 0`, `pauseMin: 0`, `vam: 0` et `windOn: false` dans les trois pages ; l'utilisateur les active en montant le curseur. VAM 0 = « désactivée » : `simulate` et l'estimateur de `cum` n'ajoutent plus `D+ / VAM` (garde `opt.vam > 0`), le curseur `#vam` et Moi (`ME_STEP`) descendent à 0, le résumé de la planification n'affiche plus que les réglages actifs. Ne change pas les réglages déjà enregistrés (`pmr-opt*`), seulement les nouveaux comptes ou après réinitialisation.
+
+- Voile de nuages hauts (26/11/2026) : `skyFix` sur chaque réponse Open-Meteo — codes secs 1–3 de jour, soleil ≥ 80 % de l'heure → code 1 (« Plutôt ensoleillé »), ≥ 40 % et code 3 → 2. Cas Maroc (Zagora, 8 déc.) : nébulosité 100 % de cirrus seulement, `sunshine_duration` 3600 s : l'app affichait « Couvert » à chaque heure et « Grand soleil tout du long » dans le résumé.
